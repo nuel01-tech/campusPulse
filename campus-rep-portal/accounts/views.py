@@ -29,10 +29,29 @@ class UpdateMatricView(APIView):
     def patch(self, request):
         matric_number = request.data.get('matric_number')
         level = request.data.get('level')
+        class_code = request.data.get('class_code')
+        phone_number = request.data.get('phone_number')
 
         if matric_number:
             request.user.matric_number = matric_number
-        if level:
+
+        if phone_number:
+            request.user.phone_number = phone_number
+
+        if level and str(level) != str(request.user.level):
+            # Level is changing — require a valid class code for the new level
+            code = (class_code or '').strip().upper()
+            expected_code = ClassCode.objects.filter(
+                department=request.user.department,
+                level=level
+            ).first()
+
+            if not expected_code or expected_code.code.upper() != code:
+                return Response(
+                    {"detail": "Invalid class code for the selected level."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             request.user.level = level
 
         request.user.save()

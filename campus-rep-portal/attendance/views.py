@@ -106,20 +106,20 @@ class LectureSessionToggleView(generics.UpdateAPIView):
             )
         else:
             serializer.save(is_active=True)
-    try:
-        students = User.objects.filter(
+        try:
+            students = User.objects.filter(
             department=serializer.instance.department,
             level=serializer.instance.level,
             role='STUDENT'
         )
-        for student in students:
-            send_push_to_user(
+            for student in students:
+                send_push_to_user(
                 student,
                 f"{serializer.instance.course_code} is now live",
                 f"Check in at {serializer.instance.venue_name} — attendance is open now."
             )
-    except Exception:
-        pass
+        except Exception:
+            pass
 
 class AnnouncementCreateView(generics.CreateAPIView):
     queryset = Announcement.objects.all()
@@ -163,7 +163,10 @@ class MyStatsView(APIView):
         ).order_by('-created_at')
 
         total_sessions = eligible_sessions.count()
-        attended = AttendanceRecord.objects.filter(student=request.user).count()
+        attended = AttendanceRecord.objects.filter(
+            student=request.user,
+            session__in=eligible_sessions
+        ).count()
         rate = round((attended / total_sessions) * 100) if total_sessions > 0 else 0
 
         streak = 0
