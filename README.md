@@ -1,3 +1,4 @@
+
 # CampusPulse
 
 A campus attendance and department-communication platform built for OOU class representatives and students. GPS-verified check-in, live session management, department/level-filtered announcements, and attendance analytics.
@@ -35,3 +36,7 @@ npm run dev
 
 ## Status
 Actively in development. Core attendance flow, session management, announcements, and exports are functional. A few pages (rep announcement composer, student history) are placeholders pending backend wiring.
+=======
+# campusPulse
+a Platform for student Attendance
+b3c46149f3bf392eb9699812abdfdf050f787125
