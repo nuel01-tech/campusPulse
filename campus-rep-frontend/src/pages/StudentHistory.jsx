@@ -1,0 +1,3 @@
+import AppShell from '../components/AppShell';
+function StudentHistory(){return <AppShell><div className="dashboard-head"><div><span className="eyebrow">Attendance history</span><h1>Your attendance record.</h1><p>Review previous classes and your attendance status.</p></div></div><section className="panel"><div className="panel-head"><div><span className="eyebrow">History</span><h2>Recent attendance</h2></div><button className="button secondary small">Filter</button></div><div className="empty-state"><span>—</span><h3>History view is ready for your records.</h3><p>The visual layer is in place. We will connect the detailed history endpoint in the backend pass.</p></div></section></AppShell>}
+export default StudentHistory;

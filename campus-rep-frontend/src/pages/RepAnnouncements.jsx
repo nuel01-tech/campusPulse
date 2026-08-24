@@ -1,0 +1,3 @@
+import AppShell from '../components/AppShell';
+function RepAnnouncements(){return <AppShell role="CLASS_REP"><div className="dashboard-head"><div><span className="eyebrow">Communication</span><h1>Announcements.</h1><p>Publish clear, department-level updates for your class.</p></div><button className="button primary">+ New announcement</button></div><section className="panel"><div className="empty-state"><span>—</span><h3>Your announcement feed will live here.</h3><p>The compose experience is already designed; API wiring can come in the next pass.</p></div></section></AppShell>}
+export default RepAnnouncements;
