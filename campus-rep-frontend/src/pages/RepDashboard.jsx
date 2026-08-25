@@ -256,7 +256,7 @@ function RepDashboard() {
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
                 min={10}
-                max={200}
+                max={20000000}
               />
             </label>
             <button type="submit" className="button primary" disabled={loading}>
