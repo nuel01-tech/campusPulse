@@ -34,9 +34,11 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://campuspulse-production-67dd.up.railway.app',
+    'https://campuspulse-production-823c.up.railway.app',
 ]
 
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
 
