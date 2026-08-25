@@ -159,4 +159,5 @@ VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY')
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://10.83.145.244:5173",
+    "https://campusoou.netlify.app",
 ]
