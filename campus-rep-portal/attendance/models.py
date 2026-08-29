@@ -5,6 +5,7 @@ from django.db import models
 from django.conf import settings
 from accounts.models import Department
 
+from cloudinary_storage.storage import RawMediaCloudinaryStorage
 
 class LectureSession(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
@@ -99,6 +100,8 @@ class Notification(models.Model):
         ordering = ['-created_at']
 
 
+
+
 class CampusDocument(models.Model):
     title = models.CharField(max_length=180)
     description = models.TextField(blank=True)
@@ -108,7 +111,7 @@ class CampusDocument(models.Model):
         ('100', '100 Level'), ('200', '200 Level'), ('300', '300 Level'),
         ('400', '400 Level'), ('500', '500 Level'),
     ])
-    file = models.FileField(upload_to='campus_documents/')
+    file = models.FileField(upload_to='campus_documents/', storage=RawMediaCloudinaryStorage())
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campus_documents')
     created_at = models.DateTimeField(auto_now_add=True)
 
