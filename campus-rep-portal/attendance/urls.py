@@ -3,6 +3,7 @@ from .views import (
     LectureSessionCreateView,
     LectureSessionToggleView,
     LectureSessionDeleteView,
+    CampusDocumentListCreateView, CampusDocumentDownloadView,
     CheckInView,
     ActiveSessionsView,
     MySessionsView,
@@ -11,7 +12,7 @@ from .views import (
     MyStatsView,
     ExportAttendanceView,
     AuditLogView,
-    MyClassCodeView,
+    MyClassCodeView, NotificationListView, NotificationReadView, NotificationReadAllView,
 )
 
 urlpatterns = [
@@ -20,6 +21,8 @@ urlpatterns = [
     path('sessions/<int:pk>/delete/', LectureSessionDeleteView.as_view(), name='session-delete'),
     path('sessions/<int:pk>/checkin/', CheckInView.as_view(), name='session-checkin'),
     path('sessions/<int:pk>/export/', ExportAttendanceView.as_view(), name='session-export'),
+    path('documents/', CampusDocumentListCreateView.as_view(), name='documents'),
+    path('documents/<int:pk>/download/', CampusDocumentDownloadView.as_view(), name='document-download'),
     path('sessions/active/', ActiveSessionsView.as_view(), name='sessions-active'),
     path('sessions/mine/', MySessionsView.as_view(), name='sessions-mine'),
     path('announcements/create/', AnnouncementCreateView.as_view(), name='announcement-create'),
@@ -27,4 +30,7 @@ urlpatterns = [
     path('my-stats/', MyStatsView.as_view(), name='my-stats'),
     path('audit-log/', AuditLogView.as_view(), name='audit-log'),
     path('my-class-code/', MyClassCodeView.as_view(), name='my-class-code'),
+    path('notifications/', NotificationListView.as_view(), name='notifications'),
+    path('notifications/read-all/', NotificationReadAllView.as_view(), name='notifications-read-all'),
+    path('notifications/<int:pk>/read/', NotificationReadView.as_view(), name='notification-read'),
 ]

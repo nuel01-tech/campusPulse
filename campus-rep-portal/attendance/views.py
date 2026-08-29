@@ -4,17 +4,20 @@ from rest_framework import serializers
 from .serializers import LectureSessionSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.http import HttpResponse, FileResponse
+from django.utils.text import get_valid_filename
+from django.db import models
 from rest_framework import status
-from .models import LectureSession, AttendanceRecord
+from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
 from .utils import haversine_distance
 from .models import Announcement
-from .serializers import AnnouncementSerializer
+from .serializers import AnnouncementSerializer, CampusDocumentSerializer, CampusDocumentUploadSerializer
 from rest_framework.exceptions import ValidationError
 from .models import AuditLog
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from accounts.models import User
-from accounts.views import send_push_to_user
+from accounts.push import send_email_to_user, send_push_to_user
 
 class AnnouncementListView(generics.ListAPIView):
     serializer_class = AnnouncementSerializer
@@ -77,49 +80,104 @@ class LectureSessionCreateView(generics.CreateAPIView):
     permission_classes = [IsClassRep]
 
     def perform_create(self, serializer):
-        session = serializer.save(department=self.request.user.department)
+        session = serializer.save(
+            department=self.request.user.department,
+            is_active=False,
+            has_ended=False,
+        )
         AuditLog.objects.create(
             rep=self.request.user,
             action='CREATED',
             course_code=session.course_code,
             venue_name=session.venue_name,
         )
-class LectureSessionToggleView(generics.UpdateAPIView):
-    queryset = LectureSession.objects.all()
-    serializer_class = LectureSessionSerializer
+        students = User.objects.filter(
+            department=session.department, level=session.level, role='STUDENT'
+        )
+        for student in students.iterator():
+            Notification.objects.create(
+                user=student, type='SESSION',
+                title=f'{session.course_code} session created',
+                body=f'{session.venue_name} · {session.level} Level. Your class rep has created a new attendance session.',
+            )
+            if not student.session_notifications:
+                continue
+            try:
+                send_push_to_user(
+                    student,
+                    f'{session.course_code} session created',
+                    f'New session at {session.venue_name}. Check CampusPulse for details.',
+                )
+                send_email_to_user(
+                    student, f'{session.course_code} session created',
+                    f'Your class rep created a new {session.course_code} session at {session.venue_name}. Open CampusPulse for details.',
+                )
+            except Exception:
+                pass
+class LectureSessionToggleView(APIView):
     permission_classes = [IsClassRep]
 
-    def get_queryset(self):
-        return LectureSession.objects.filter(department=self.request.user.department)
-
-    def perform_update(self, serializer):
-        if serializer.instance.has_ended:
-            raise ValidationError("This session has already ended and cannot be reopened. Create a new session instead.")
-
-        if serializer.instance.is_active:
-            serializer.save(is_active=False, has_ended=True)
-            AuditLog.objects.create(
-                rep=self.request.user,
-                action='ENDED',
-                course_code=serializer.instance.course_code,
-                venue_name=serializer.instance.venue_name,
-            )
-        else:
-            serializer.save(is_active=True)
+    def post(self, request, pk):
         try:
-            students = User.objects.filter(
-            department=serializer.instance.department,
-            level=serializer.instance.level,
-            role='STUDENT'
-        )
-            for student in students:
-                send_push_to_user(
-                student,
-                f"{serializer.instance.course_code} is now live",
-                f"Check in at {serializer.instance.venue_name} — attendance is open now."
+            session = LectureSession.objects.get(
+                pk=pk,
+                department=request.user.department,
             )
-        except Exception:
-            pass
+        except LectureSession.DoesNotExist:
+            return Response({'detail': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if session.has_ended:
+            return Response(
+                {'detail': 'This session has already ended and cannot be reopened. Create a new session instead.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if session.is_active:
+            session.is_active = False
+            session.has_ended = True
+            session.save(update_fields=['is_active', 'has_ended'])
+            AuditLog.objects.create(
+                rep=request.user,
+                action='ENDED',
+                course_code=session.course_code,
+                venue_name=session.venue_name,
+            )
+            return Response({'detail': 'Session ended.', 'session': LectureSessionSerializer(session).data})
+
+        session.is_active = True
+        session.save(update_fields=['is_active'])
+        AuditLog.objects.create(
+            rep=request.user,
+            action='STARTED',
+            course_code=session.course_code,
+            venue_name=session.venue_name,
+        )
+        students = User.objects.filter(
+            department=session.department,
+            level=session.level,
+            role='STUDENT',
+        )
+        for student in students.iterator():
+            Notification.objects.create(
+                user=student, type='SESSION',
+                title=f'{session.course_code} is now live',
+                body=f'Attendance is open at {session.venue_name}.',
+            )
+            if not student.session_notifications:
+                continue
+            try:
+                send_push_to_user(
+                    student,
+                    f'{session.course_code} is now live',
+                    f'Check in at {session.venue_name} — attendance is open now.',
+                )
+                send_email_to_user(
+                    student, f'{session.course_code} is now live',
+                    f'Attendance is now open at {session.venue_name}. Check in through CampusPulse.',
+                )
+            except Exception:
+                pass
+        return Response({'detail': 'Session started.', 'session': LectureSessionSerializer(session).data})
 
 class AnnouncementCreateView(generics.CreateAPIView):
     queryset = Announcement.objects.all()
@@ -127,11 +185,26 @@ class AnnouncementCreateView(generics.CreateAPIView):
     permission_classes = [IsClassRep]
 
     def perform_create(self, serializer):
-        serializer.save(
+        announcement = serializer.save(
             department=self.request.user.department,
             level=self.request.user.level,
-            posted_by=self.request.user
+            posted_by=self.request.user,
         )
+        students = User.objects.filter(
+            department=announcement.department, level=announcement.level, role='STUDENT'
+        )
+        for student in students.iterator():
+            Notification.objects.create(
+                user=student, type='ANNOUNCEMENT',
+                title=announcement.title, body=announcement.body,
+            )
+            if not student.announcement_notifications:
+                continue
+            try:
+                send_push_to_user(student, announcement.title, announcement.body[:180])
+                send_email_to_user(student, announcement.title, announcement.body)
+            except Exception:
+                pass
 
 class ActiveSessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
@@ -283,6 +356,82 @@ class ExportAttendanceView(APIView):
 
         return response
 
+
+class IsStudentOrRep(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role in {'STUDENT', 'CLASS_REP'}
+
+
+class CampusDocumentListCreateView(generics.ListCreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        return CampusDocumentUploadSerializer if self.request.method == 'POST' else CampusDocumentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = CampusDocument.objects.select_related('department', 'uploaded_by')
+        if user.role != 'SUPER_ADMIN':
+            if not user.department:
+                return queryset.none()
+            # Keep academic documents inside the user's department and level.
+            queryset = queryset.filter(department=user.department, level=user.level)
+        query = (self.request.query_params.get('q') or '').strip()
+        if query:
+            queryset = queryset.filter(
+                models.Q(title__icontains=query)
+                | models.Q(description__icontains=query)
+                | models.Q(course_code__icontains=query)
+                | models.Q(uploaded_by__first_name__icontains=query)
+                | models.Q(uploaded_by__last_name__icontains=query)
+            )
+        return queryset
+
+    def perform_create(self, serializer):
+        if self.request.user.role not in {'STUDENT', 'CLASS_REP'}:
+            raise ValidationError('Only students and class representatives can upload documents.')
+        if not self.request.user.department or not self.request.user.level:
+            raise ValidationError('Complete your department and level before uploading a document.')
+        level = serializer.validated_data.get('level')
+        if level != self.request.user.level:
+            raise ValidationError({'level': 'You can only upload documents for your current level.'})
+        serializer.save(
+            department=self.request.user.department,
+            uploaded_by=self.request.user,
+        )
+
+
+class CampusDocumentDownloadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            document = CampusDocument.objects.select_related('department').get(pk=pk)
+        except CampusDocument.DoesNotExist:
+            return Response({'detail': 'Document not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role != 'SUPER_ADMIN' and (
+            document.department_id != getattr(request.user.department, 'id', None)
+            or document.level != request.user.level
+        ):
+            return Response({'detail': 'You do not have access to this document.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            document.file.open('rb')
+        except (FileNotFoundError, OSError, ValueError):
+            return Response({'detail': 'The document file is unavailable.'}, status=status.HTTP_404_NOT_FOUND)
+
+        filename = get_valid_filename(document.file.name.rsplit('/', 1)[-1]) or f'document-{document.pk}.pdf'
+        response = FileResponse(document.file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'type', 'title', 'body', 'is_read', 'created_at']
+
+
 class AuditLogSerializer(serializers.ModelSerializer):
     rep_name = serializers.CharField(source='rep.get_full_name', read_only=True)
 
@@ -297,6 +446,35 @@ class AuditLogView(generics.ListAPIView):
 
     def get_queryset(self):
         return AuditLog.objects.filter(rep__department=self.request.user.department)
+
+class NotificationListView(generics.ListAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)[:50]
+
+
+class NotificationReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            notification = Notification.objects.get(pk=pk, user=request.user)
+        except Notification.DoesNotExist:
+            return Response({'detail': 'Notification not found.'}, status=status.HTTP_404_NOT_FOUND)
+        notification.is_read = True
+        notification.save(update_fields=['is_read'])
+        return Response({'detail': 'Notification marked as read.'})
+
+
+class NotificationReadAllView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({'detail': 'All notifications marked as read.'})
+
 
 from .models import ClassCode, generate_class_code
 

@@ -13,13 +13,16 @@ function Signup() {
     classCode: '',
   });
   const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   useEffect(() => {
     api
       .get('/accounts/departments/')
-      .then((r) => setDepartments(r.data))
-      .catch(() => setError('Failed to load departments.'));
+      .then((r) => setDepartments(Array.isArray(r.data) ? r.data : (r.data.results || [])))
+      .catch(() => setError('Failed to load departments. Please refresh and try again.'))
+      .finally(() => setDepartmentsLoading(false));
   }, []);
   const setField = (k, v) => setForm({ ...form, [k]: v });
   const submit = async (e) => {
@@ -35,6 +38,7 @@ function Signup() {
         department: form.department,
         level: form.level,
         class_code: form.classCode,
+        terms_accepted: termsAccepted,
       });
       navigate('/login');
     } catch (e) {
@@ -44,6 +48,7 @@ function Signup() {
         serverError?.department?.[0] ||
         serverError?.username?.[0] ||
         serverError?.email?.[0] ||
+        serverError?.terms_accepted?.[0] ||
         'Signup failed. Please check your details.';
       setError(message);
     }
@@ -92,8 +97,8 @@ function Signup() {
             </label>
             <label>
               Department
-              <select value={form.department} onChange={(e) => setField('department', e.target.value)} required>
-                <option value="">Select department</option>
+              <select value={form.department} onChange={(e) => setField('department', e.target.value)} required disabled={departmentsLoading}>
+                <option value="">{departmentsLoading ? 'Loading departments…' : 'Select department'}</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
@@ -122,9 +127,14 @@ function Signup() {
             </label>
             <label className="full">
               Password
-              <input type="password" value={form.password} onChange={(e) => setField('password', e.target.value)} required />
+              <input type="password" value={form.password} onChange={(e) => setField('password', e.target.value)} minLength={8} required />
             </label>
-            {error && <div className="form-error">{error}</div>}
+            <label className="terms-check full">
+              <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} required />
+              <span>I agree to the <Link to="/terms">Terms & Conditions</Link>.</span>
+            </label>
+            {departmentsLoading && <div className="field-hint full">Loading the department list…</div>}
+            {error && <div className="form-error full">{error}</div>}
             <button type="submit" className="button primary full">
               Create account
             </button>

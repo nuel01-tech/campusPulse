@@ -123,7 +123,7 @@ function RepDashboard() {
   };
   const toggle = async (id) => {
     try {
-      await api.patch(`/attendance/sessions/${id}/toggle/`);
+      await api.post(`/attendance/sessions/${id}/toggle/`);
       load();
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to update session.');
@@ -212,7 +212,7 @@ function RepDashboard() {
         </div>
       </section>
       <div className="content-grid rep-grid">
-        <section className="panel" id="create-session">
+        <section className="panel" id="new-session">
           <div className="panel-head">
             <div>
               <span className="eyebrow">Session setup</span>
@@ -300,6 +300,33 @@ function RepDashboard() {
           </form>
         </section>
       </div>
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <span className="eyebrow">Session control</span>
+            <h2>Your sessions</h2>
+          </div>
+          <button className="button secondary small" onClick={() => navigate('/rep/sessions')}>View all</button>
+        </div>
+        {sessions.length === 0 ? (
+          <div className="empty-state compact"><p>No sessions created yet.</p></div>
+        ) : (
+          <div className="session-table-list">
+            {sessions.slice(0, 5).map((s) => (
+              <div className="rep-session-card compact" key={s.id}>
+                <div className="rep-session-main">
+                  <div className="session-icon">{s.course_code?.slice(0, 2) || 'CP'}</div>
+                  <div><div className="rep-session-title-row"><strong>{s.course_code}</strong><span className={`status-badge ${s.has_ended ? 'neutral' : s.is_active ? 'green' : 'amber'}`}><i />{s.has_ended ? 'Ended' : s.is_active ? 'Live' : 'Ready'}</span></div><p>{s.venue_name} · {s.level} Level · {s.attendee_count || 0} check-ins</p></div>
+                </div>
+                <div className="rep-session-actions">
+                  {!s.has_ended && <button className={`button ${s.is_active ? 'secondary' : 'primary'} small`} onClick={() => toggle(s.id)}>{s.is_active ? 'End session' : 'Start session'}</button>}
+                  <button className="button secondary small" onClick={() => exportSession(s)}>Export</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
       <section className="panel">
         <div className="panel-head">
           <div>

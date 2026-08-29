@@ -27,8 +27,16 @@ class User(AbstractUser):
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
     enable_wakeup_calls = models.BooleanField(default=False)
+    push_notifications = models.BooleanField(default=True)
+    email_notifications = models.BooleanField(default=True)
+    session_notifications = models.BooleanField(default=True)
+    announcement_notifications = models.BooleanField(default=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
     matric_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     level = models.CharField(max_length=3, choices=LEVELS, null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
+
+
 class PushSubscription(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     endpoint = models.URLField(max_length=500)

@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import api from '../api/axios';
 
 const icons = {
   grid: <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>,
@@ -10,6 +11,7 @@ const icons = {
   user: <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>,
   logout: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></svg>,
   menu: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>,
+  file: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>,
   bell: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>,
 };
 
@@ -35,15 +37,34 @@ function AppShell({ role = 'STUDENT', children }) {
         ['/rep/sessions', 'Sessions', 'calendar'],
         ['/rep/announcements', 'Announcements', 'megaphone'],
         ['/rep/activity', 'Activity log', 'clock'],
-        ['/settings', 'Settings', 'settings'],
+        ['/notifications', 'Notifications', 'bell'],
+        ['/documents', 'Documents', 'file'],
+        ['/profile', 'Profile', 'user'],
+        ['/security', 'Security', 'settings'],
+        ['/preferences', 'Preferences', 'settings'],
       ]
     : [
         ['/student', 'Dashboard', 'grid'],
         ['/student/attendance', 'Attendance', 'calendar'],
         ['/student/announcements', 'Announcements', 'megaphone'],
         ['/student/history', 'History', 'clock'],
-        ['/settings', 'Settings', 'settings'],
+        ['/notifications', 'Notifications', 'bell'],
+        ['/documents', 'Documents', 'file'],
+        ['/profile', 'Profile', 'user'],
+        ['/security', 'Security', 'settings'],
+        ['/preferences', 'Preferences', 'settings'],
       ];
+
+  const [unread, setUnread] = useState(0);
+  const [profile, setProfile] = useState(null);
+  useEffect(() => { api.get('/accounts/profile/').then(r => setProfile(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    let mounted = true;
+    const load = () => api.get('/attendance/notifications/').then(r => { if (mounted) setUnread((r.data || []).filter(n => !n.is_read).length); }).catch(() => {});
+    load();
+    const timer = setInterval(load, 20000);
+    return () => { mounted = false; clearInterval(timer); };
+  }, []);
 
   const logout = () => {
     localStorage.removeItem('access');
@@ -65,7 +86,7 @@ function AppShell({ role = 'STUDENT', children }) {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="mini-profile"><div className="avatar">{username.slice(0, 1).toUpperCase()}</div><div><strong>{username}</strong><span>{isRep ? 'Class Rep' : 'Student'}</span></div></div>
+          <div className="mini-profile">{profile?.profile_picture ? <img className="avatar profile-avatar-image" src={profile.profile_picture} alt="" /> : <div className="avatar">{username.slice(0, 1).toUpperCase()}</div>}<div><strong>{username}</strong><span>{isRep ? 'Class Rep' : 'Student'}</span></div></div>
           <button className="logout-link" onClick={logout}><span className="side-icon">{icons.logout}</span>Sign out</button>
         </div>
       </aside>
@@ -74,8 +95,8 @@ function AppShell({ role = 'STUDENT', children }) {
           <button className="mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open menu">{icons.menu}</button>
           <div className="topbar-title"><span>Olabisi Onabanjo University</span><strong>{isRep ? 'Representative workspace' : 'Student workspace'}</strong></div>
           <div className="topbar-actions">
-            <button className="icon-button" aria-label="Notifications">{icons.bell}<span className="notification-dot" /></button>
-            <button className="profile-button" onClick={() => navigate('/settings')}><span className="avatar small">{username.slice(0, 1).toUpperCase()}</span><span className="profile-name">{username}</span></button>
+            <button className="icon-button" aria-label="Notifications" onClick={() => navigate('/notifications')}>{icons.bell}{unread > 0 && <span className="notification-count">{unread > 9 ? '9+' : unread}</span>}</button>
+            <button className="profile-button" onClick={() => navigate('/settings')}>{profile?.profile_picture ? <img className="avatar small profile-avatar-image" src={profile.profile_picture} alt="" /> : <span className="avatar small">{username.slice(0, 1).toUpperCase()}</span>}<span className="profile-name">{username}</span></button>
           </div>
         </header>
         <div className="page-content">{children}</div>

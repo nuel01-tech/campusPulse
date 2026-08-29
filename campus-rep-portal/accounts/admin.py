@@ -6,7 +6,7 @@ from .models import User, Department
 class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('CampusPulse Info', {
-            'fields': ('role', 'department', 'level', 'matric_number', 'phone_number', 'enable_wakeup_calls')
+            'fields': ('role', 'department', 'level', 'matric_number', 'phone_number', 'profile_picture', 'enable_wakeup_calls', 'push_notifications', 'email_notifications', 'session_notifications', 'announcement_notifications')
         }),
     )
     list_display = ('username', 'email', 'role', 'department', 'level', 'is_staff')

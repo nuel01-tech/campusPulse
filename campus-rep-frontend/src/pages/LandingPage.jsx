@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ function LandingPage() {
       <section id="features" className="section container-wide"><div className="section-heading"><span className="eyebrow">Everything in one place</span><h2>Less admin. More focus.</h2><p>The product is organized around the actual tasks students and representatives perform every week.</p></div><div className="feature-grid"><article><span className="feature-number">01</span><h3>Location-based check-in</h3><p>Students can confirm attendance when they are within the configured lecture radius.</p></article><article><span className="feature-number">02</span><h3>Session management</h3><p>Representatives can create, start, monitor, end and export lecture sessions.</p></article><article><span className="feature-number">03</span><h3>Announcements</h3><p>Keep the class informed without scattering important updates across different chats.</p></article></div></section>
       <section id="how" className="section muted-section"><div className="container-wide"><div className="section-heading"><span className="eyebrow">How it works</span><h2>A simple three-step routine.</h2></div><div className="steps"><div><b>01</b><h3>Create</h3><p>A representative creates a lecture session and sets the attendance radius.</p></div><div><b>02</b><h3>Check in</h3><p>Students open the active session and verify their location before checking in.</p></div><div><b>03</b><h3>Track</h3><p>Attendance records and class activity stay organized for later review.</p></div></div></div></section>
       <section id="about" className="cta-section container-wide"><div><span className="eyebrow">CampusPulse</span><h2>A calmer way to run attendance.</h2><p>Built for the pace of university life, with a focused interface that keeps the important things visible.</p></div><button className="button light large" onClick={() => navigate('/signup')}>Create an account →</button></section>
-      <footer className="landing-footer container-wide"><div className="brand"><span className="brand-mark">CP</span><span>CampusPulse</span></div><span>© 2026 CampusPulse</span></footer>
+      <footer className="landing-footer container-wide"><div className="brand"><span className="brand-mark">CP</span><span>CampusPulse</span></div><span className="footer-links"><Link to="/terms">Terms & Conditions</Link><span>© 2026 CampusPulse</span></span></footer>
     </div>
   );
 }
