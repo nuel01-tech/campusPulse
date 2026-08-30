@@ -12,18 +12,18 @@ function Signup() {
     level: '',
     classCode: '',
   });
-  const [departments, setDepartments] = useState([]);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-  useEffect(() => {
-    api
-      .get('/accounts/departments/')
-      .then((r) => setDepartments(Array.isArray(r.data) ? r.data : (r.data.results || [])))
-      .catch(() => setError('Failed to load departments. Please refresh and try again.'))
-      .finally(() => setDepartmentsLoading(false));
-  }, []);
+const [departments, setDepartments] = useState([]);
+const [loadingDepartments, setLoadingDepartments] = useState(true);
+const [error, setError] = useState('');
+const navigate = useNavigate();
+
+useEffect(() => {
+  api
+    .get('/accounts/departments/')
+    .then((r) => setDepartments(r.data))
+    .catch(() => setError('Failed to load departments.'))
+    .finally(() => setLoadingDepartments(false));
+}, []);
   const setField = (k, v) => setForm({ ...form, [k]: v });
   const submit = async (e) => {
     e.preventDefault();
@@ -95,15 +95,15 @@ function Signup() {
               Email
               <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} required />
             </label>
-            <label>
-              Department
-              <select value={form.department} onChange={(e) => setField('department', e.target.value)} required disabled={departmentsLoading}>
-                <option value="">{departmentsLoading ? 'Loading departments…' : 'Select department'}</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </label>
+           <label>
+  Department
+  <select value={form.department} onChange={(e) => setField('department', e.target.value)} required disabled={loadingDepartments}>
+    <option value="">{loadingDepartments ? 'Loading departments…' : 'Select department'}</option>
+    {departments.map((d) => (
+      <option key={d.id} value={d.id}>{d.name}</option>
+    ))}
+  </select>
+</label>
             <label>
               Level
               <select value={form.level} onChange={(e) => setField('level', e.target.value)} required>
