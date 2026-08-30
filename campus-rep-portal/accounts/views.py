@@ -1,8 +1,10 @@
+from logging import config
+
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
+from decouple import config
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -146,18 +148,18 @@ class ForgotPasswordView(APIView):
         reset_url = f'{frontend_url}/reset-password/{uid}/{token}'
 
         try:
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = config('BREVO_API_KEY')
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=[{"email": user.email}],
-        sender={"name": "CampusPulse", "email": "no-reply@campuspulse.app"},
-        subject="Reset your CampusPulse password",
-        text_content=f"Use this link to reset your CampusPulse password:\n\n{reset_url}\n\nThis link expires when your password is changed or the token becomes invalid.",
-    )
-    api_instance.send_transac_email(send_smtp_email)
-except ApiException:
-    pass
+            configuration = sib_api_v3_sdk.Configuration()
+            configuration.api_key['api-key'] = config('BREVO_API_KEY')
+            api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                to=[{"email": user.email}],
+                sender={"name": "CampusPulse", "email": "no-reply@campuspulse.app"},
+                subject="Reset your CampusPulse password",
+                text_content=f"Use this link to reset your CampusPulse password:\n\n{reset_url}\n\nThis link expires when your password is changed or the token becomes invalid.",
+            )
+            api_instance.send_transac_email(send_smtp_email)
+        except ApiException:
+                    pass
 
         if settings.DEBUG:
             generic['reset_url'] = reset_url
