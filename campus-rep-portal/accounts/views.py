@@ -10,7 +10,8 @@ from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 from attendance.models import ClassCode
 from .models import Department, PushSubscription, User
 from .push import send_push_to_user
@@ -144,13 +145,19 @@ class ForgotPasswordView(APIView):
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173').rstrip('/')
         reset_url = f'{frontend_url}/reset-password/{uid}/{token}'
 
-        send_mail(
-            'Reset your CampusPulse password',
-            f'Use this link to reset your CampusPulse password:\n\n{reset_url}\n\nThis link expires when your password is changed or the token becomes invalid.',
-            getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@campuspulse.app'),
-            [user.email],
-            fail_silently=True,
-        )
+        try:
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = config('BREVO_API_KEY')
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=[{"email": user.email}],
+        sender={"name": "CampusPulse", "email": "no-reply@campuspulse.app"},
+        subject="Reset your CampusPulse password",
+        text_content=f"Use this link to reset your CampusPulse password:\n\n{reset_url}\n\nThis link expires when your password is changed or the token becomes invalid.",
+    )
+    api_instance.send_transac_email(send_smtp_email)
+except ApiException:
+    pass
 
         if settings.DEBUG:
             generic['reset_url'] = reset_url
