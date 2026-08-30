@@ -158,8 +158,8 @@ class ForgotPasswordView(APIView):
                 text_content=f"Use this link to reset your CampusPulse password:\n\n{reset_url}\n\nThis link expires when your password is changed or the token becomes invalid.",
             )
             api_instance.send_transac_email(send_smtp_email)
-        except ApiException:
-                    pass
+        except ApiException as e:
+            print(f"BREVO ERROR: {e}")
 
         if settings.DEBUG:
             generic['reset_url'] = reset_url
