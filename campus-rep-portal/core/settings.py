@@ -44,18 +44,19 @@ SESSION_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
     'corsheaders',
-    'cloudinary_storage',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
+    'django.contrib.staticfiles',      # ← now before cloudinary_storage
+    'cloudinary_storage',
     'cloudinary',
     'rest_framework',
     'accounts',
     'attendance',
 ]
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
