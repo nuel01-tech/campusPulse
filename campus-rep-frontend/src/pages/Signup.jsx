@@ -14,6 +14,7 @@ function Signup() {
   });
 const [departments, setDepartments] = useState([]);
 const [loadingDepartments, setLoadingDepartments] = useState(true);
+const [termsAccepted, setTermsAccepted] = useState(false);
 const [error, setError] = useState('');
 const navigate = useNavigate();
 
@@ -133,7 +134,7 @@ useEffect(() => {
               <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} required />
               <span>I agree to the <Link to="/terms">Terms & Conditions</Link>.</span>
             </label>
-            {departmentsLoading && <div className="field-hint full">Loading the department list…</div>}
+           {loadingDepartments && <div className="field-hint full">Loading the department list…</div>}
             {error && <div className="form-error full">{error}</div>}
             <button type="submit" className="button primary full">
               Create account
