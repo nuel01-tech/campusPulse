@@ -1,12 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Department
+from .models import User, Department, PushSubscription
 
 
 class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('CampusPulse Info', {
-            'fields': ('role', 'department', 'level', 'matric_number', 'phone_number', 'profile_picture', 'enable_wakeup_calls', 'push_notifications', 'email_notifications', 'session_notifications', 'announcement_notifications')
+            'fields': ('role', 'department', 'level', 'matric_number', 'phone_number', 'enable_wakeup_calls')
         }),
     )
     list_display = ('username', 'email', 'role', 'department', 'level', 'is_staff')
@@ -14,3 +14,4 @@ class CustomUserAdmin(UserAdmin):
 
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Department)
+admin.site.register(PushSubscription)
