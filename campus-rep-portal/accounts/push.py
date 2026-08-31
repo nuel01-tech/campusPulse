@@ -28,5 +28,5 @@ def send_email_to_user(user, subject, body):
         return
     send_mail(
         subject, body, getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@campuspulse.app'),
-        [user.email], fail_silently=True,
+        [user.email], fail_silently=False,
     )
