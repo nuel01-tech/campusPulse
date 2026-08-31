@@ -175,8 +175,8 @@ class LectureSessionToggleView(APIView):
                     student, f'{session.course_code} is now live',
                     f'Attendance is now open at {session.venue_name}. Check in through CampusPulse.',
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"PUSH SEND FAILED: {e}")
         return Response({'detail': 'Session started.', 'session': LectureSessionSerializer(session).data})
 
 class AnnouncementCreateView(generics.CreateAPIView):
