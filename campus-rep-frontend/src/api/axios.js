@@ -1,8 +1,12 @@
 import axios from 'axios';
 
+const rawBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const cleanBaseURL = rawBaseURL.replace(/\/+$/, '');
+const baseURL = cleanBaseURL.endsWith('/api') ? cleanBaseURL : `${cleanBaseURL}/api`;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  timeout: 12000,
+  baseURL,
+  timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {

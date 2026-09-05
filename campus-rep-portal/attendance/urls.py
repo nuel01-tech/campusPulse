@@ -12,7 +12,7 @@ from .views import (
     MyStatsView,
     ExportAttendanceView,
     AuditLogView,
-    MyClassCodeView, NotificationListView, NotificationReadView, NotificationReadAllView,
+    MyClassCodeView, NotificationListView, NotificationReadView, NotificationReadAllView, MyHistoryView
 )
 
 urlpatterns = [
@@ -33,4 +33,5 @@ urlpatterns = [
     path('notifications/', NotificationListView.as_view(), name='notifications'),
     path('notifications/read-all/', NotificationReadAllView.as_view(), name='notifications-read-all'),
     path('notifications/<int:pk>/read/', NotificationReadView.as_view(), name='notification-read'),
+        path('my-history/', MyHistoryView.as_view(), name='my-history'),
 ]

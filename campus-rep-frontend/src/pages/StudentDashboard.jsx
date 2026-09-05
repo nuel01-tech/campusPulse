@@ -16,38 +16,48 @@ function StudentDashboard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
   let decoded = {};
   try {
     const token = localStorage.getItem("access");
     decoded = token ? jwtDecode(token) : {};
   } catch {}
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [s, a, st] = await Promise.all([
+        api.get("/attendance/sessions/active/"),
+        api.get("/attendance/announcements/"),
+        api.get("/attendance/my-stats/"),
+      ]);
+      setActiveSessions(s.data || []);
+      setAnnouncements(a.data || []);
+      setStats(st.data || null);
+    } catch {
+      setError("Some dashboard data could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [s, a, st] = await Promise.all([
-          api.get("/attendance/sessions/active/"),
-          api.get("/attendance/announcements/"),
-          api.get("/attendance/my-stats/"),
-        ]);
-        setActiveSessions(s.data);
-        setAnnouncements(a.data);
-        setStats(st.data);
-      } catch {
-        setError("Some dashboard data could not be loaded.");
-      }
-    };
-    load();
+    loadData();
   }, []);
+
   const handleCheckIn = (id) => {
     setChecking(id);
     setError("");
     setMessage("");
+
     if (!navigator.geolocation) {
       setError("Your browser does not support location.");
       setChecking(null);
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -55,20 +65,39 @@ function StudentDashboard() {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           });
-          setMessage(r.data.detail);
+          setMessage(r.data.detail || "Successfully checked in!");
+          await loadData();
         } catch (e) {
-          setError(e.response?.data?.detail || "Check-in failed.");
+          setError(
+            e.response?.data?.detail ||
+              "Check-in failed. Please make sure you are inside the lecture room."
+          );
         } finally {
           setChecking(null);
         }
       },
-      () => {
-        setError("Could not get your location. Please allow location access.");
+      (err) => {
+        let msg = "Could not get your location. Please allow location access.";
+        if (err.code === 1) {
+          msg = "Location permission denied. Please allow location in your browser settings.";
+        } else if (err.code === 2) {
+          msg = "Position unavailable. Please ensure GPS/Location is turned on.";
+        }
+        setError(msg);
         setChecking(null);
       },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   };
+
+  const shareToWhatsApp = (a) => {
+    const text = `📢 *${a.title}*\n\n${a.body}\n${a.due_date ? `\n⏳ *Due Date:* ${new Date(a.due_date).toLocaleDateString()}` : ''}\n\n— Shared via CampusPulse`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   const rate = stats?.rate ?? 0;
+  const isEligible = rate >= (stats?.eligibility_threshold ?? 70);
+
   return (
     <AppShell role="STUDENT">
       <div className="dashboard-head">
@@ -77,22 +106,102 @@ function StudentDashboard() {
             {getGreeting()}, {decoded.username || "Student"}
           </span>
           <h1>Your campus at a glance.</h1>
-          <p>Keep up with attendance, live classes and department updates.</p>
+          <p>Stay up to date with live attendance, announcements and lecture progress.</p>
         </div>
-        <button
-          className="button secondary"
-          onClick={() => navigate("/settings")}
-        >
-          View profile
-        </button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <button className="btn-refresh" onClick={loadData} disabled={loading}>
+            <span>↻</span> {loading ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            className="button secondary"
+            onClick={() => navigate("/profile")}
+          >
+            Profile
+          </button>
+        </div>
       </div>
+
       {(message || error) && (
         <div className={`notice ${message ? "success" : "error"}`}>
           {message || error}
         </div>
       )}
+
+      {/* Live Class Hero Beacon if any active session exists */}
+      {activeSessions.length > 0 && (
+        <div className="live-session-hero">
+          <div className="live-hero-header">
+            <span className="live-badge-glow">
+              <span className="radar-dot" /> Live Class in Progress
+            </span>
+            <span style={{ fontSize: "11px", opacity: 0.9 }}>
+              {activeSessions.length} active now
+            </span>
+          </div>
+          <h2 className="live-hero-title">
+            {activeSessions[0].course_code}
+          </h2>
+          <div className="live-hero-subtitle">
+            <span>📍 {activeSessions[0].venue_name}</span>
+            <span>🎓 {activeSessions[0].level} Level</span>
+            <span>🎯 Radius: {activeSessions[0].radius_meters || 50}m</span>
+          </div>
+          <button
+            className="live-checkin-btn"
+            disabled={checking === activeSessions[0].id}
+            onClick={() => handleCheckIn(activeSessions[0].id)}
+          >
+            {checking === activeSessions[0].id ? "Verifying GPS Location…" : "✓ Tap to Check In with GPS"}
+          </button>
+        </div>
+      )}
+
+      {/* Quick Action Cards Grid for Mobile Ergonomics */}
+      <div className="quick-action-grid">
+        <div className="action-tile" onClick={() => navigate("/student/attendance")}>
+          <div className="action-tile-icon" style={{ background: "#ecfdf5", color: "#059669" }}>
+            📍
+          </div>
+          <div>
+            <strong>Live Check-in</strong>
+            <span>{activeSessions.length} session{activeSessions.length === 1 ? "" : "s"} live</span>
+          </div>
+        </div>
+
+        <div className="action-tile" onClick={() => navigate("/student/history")}>
+          <div className="action-tile-icon" style={{ background: "#eff6ff", color: "#2563eb" }}>
+            📋
+          </div>
+          <div>
+            <strong>Class History</strong>
+            <span>{stats ? `${stats.attended} attended` : "View history"}</span>
+          </div>
+        </div>
+
+        <div className="action-tile" onClick={() => navigate("/student/announcements")}>
+          <div className="action-tile-icon" style={{ background: "#fef3c7", color: "#d97706" }}>
+            📢
+          </div>
+          <div>
+            <strong>Announcements</strong>
+            <span>{announcements.length} update{announcements.length === 1 ? "" : "s"}</span>
+          </div>
+        </div>
+
+        <div className="action-tile" onClick={() => navigate("/documents")}>
+          <div className="action-tile-icon" style={{ background: "#f3e8ff", color: "#7c3aed" }}>
+            📁
+          </div>
+          <div>
+            <strong>Course Docs</strong>
+            <span>Lecture notes & PDFs</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Summary Grid */}
       <div className="stat-grid">
-        <div className="stat-card accent">
+        <div className={`stat-card ${isEligible ? "accent" : ""}`}>
           <span>Attendance rate</span>
           <strong>{rate}%</strong>
           <div className="progress">
@@ -106,8 +215,8 @@ function StudentDashboard() {
         </div>
         <div className="stat-card">
           <span>Current streak</span>
-          <strong>{stats?.streak ?? "—"}</strong>
-          <small>consecutive classes</small>
+          <strong>🔥 {stats?.streak ?? 0}</strong>
+          <small>consecutive classes present</small>
           <div className="stat-mark">↗</div>
         </div>
         <div className="stat-card">
@@ -119,12 +228,14 @@ function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Main Content: Sessions & Announcements */}
       <div className="content-grid">
         <section className="panel main-panel">
           <div className="panel-head">
             <div>
-              <span className="eyebrow">Right now</span>
-              <h2>Active classes</h2>
+              <span className="eyebrow">Classes</span>
+              <h2>Available sessions</h2>
             </div>
             <button
               className="text-button"
@@ -136,8 +247,15 @@ function StudentDashboard() {
           {activeSessions.length === 0 ? (
             <div className="empty-state">
               <span>○</span>
-              <h3>No live classes</h3>
-              <p>There are no active attendance sessions at the moment.</p>
+              <h3>No classes live right now</h3>
+              <p>When your class representative starts attendance, it will appear here instantly.</p>
+              <button
+                className="btn-refresh"
+                onClick={loadData}
+                style={{ marginTop: "12px" }}
+              >
+                Check again
+              </button>
             </div>
           ) : (
             <div className="session-list">
@@ -149,7 +267,7 @@ function StudentDashboard() {
                   <div className="session-info">
                     <strong>{s.course_code}</strong>
                     <span>
-                      {s.venue_name} · {s.level} Level
+                      {s.venue_name} · {s.level} Level · {s.radius_meters || 50}m
                     </span>
                   </div>
                   <div className="session-status">
@@ -167,10 +285,11 @@ function StudentDashboard() {
             </div>
           )}
         </section>
+
         <section className="panel">
           <div className="panel-head">
             <div>
-              <span className="eyebrow">Updates</span>
+              <span className="eyebrow">Notice board</span>
               <h2>Announcements</h2>
             </div>
             <button
@@ -189,31 +308,51 @@ function StudentDashboard() {
             <div className="announcement-list">
               {announcements.slice(0, 4).map((a) => (
                 <article key={a.id}>
-  <div className="announcement-meta">
-    <span>{a.category === 'ASSIGNMENT' ? '📝 Assignment' : a.category === 'VENUE_CHANGE' ? '📍 Venue Change' : 'Department update'}</span>
-    <time>{new Date(a.created_at).toLocaleDateString()}</time>
-  </div>
-  <h3>{a.title}</h3>
-  <p>{a.body}</p>
-  {a.due_date && <p className="due-date">Due: {new Date(a.due_date).toLocaleDateString()}</p>}
-</article>
+                  <div className="announcement-meta">
+                    <span>
+                      {a.category === "ASSIGNMENT"
+                        ? "📝 Assignment"
+                        : a.category === "VENUE_CHANGE"
+                        ? "📍 Venue Change"
+                        : "📢 Department update"}
+                    </span>
+                    <time>{new Date(a.created_at).toLocaleDateString()}</time>
+                  </div>
+                  <h3>{a.title}</h3>
+                  <p>{a.body}</p>
+                  {a.due_date && (
+                    <p style={{ fontSize: "11px", color: "#d97706", fontWeight: 700, margin: "6px 0" }}>
+                      ⏳ Due: {new Date(a.due_date).toLocaleDateString()}
+                    </p>
+                  )}
+                  <div style={{ marginTop: "8px" }}>
+                    <button
+                      className="share-btn-whatsapp"
+                      onClick={() => shareToWhatsApp(a)}
+                    >
+                      <span>Share on WhatsApp</span>
+                    </button>
+                  </div>
+                </article>
               ))}
             </div>
           )}
         </section>
       </div>
+
+      {/* Exam Eligibility Strip */}
       <section className="eligibility-strip">
         <div>
-          <span className="status-dot green" />
+          <span className={`status-dot ${isEligible ? "green" : "amber"}`} />
           <div>
             <strong>
-              {rate >= (stats?.eligibility_threshold ?? 70)
-                ? "You are in good standing"
-                : "Attendance needs attention"}
+              {isEligible
+                ? "You are in good standing for exams"
+                : "Attendance needs attention (< 70%)"}
             </strong>
             <span>
               {stats
-                ? `The current requirement is ${stats.eligibility_threshold}%.`
+                ? `The OOU examination attendance threshold is ${stats.eligibility_threshold || 70}%.`
                 : "Attendance requirement"}
             </span>
           </div>
@@ -222,10 +361,12 @@ function StudentDashboard() {
           className="text-button"
           onClick={() => navigate("/student/history")}
         >
-          Review history →
+          Review full history →
         </button>
       </section>
     </AppShell>
   );
 }
+
 export default StudentDashboard;
+

@@ -6,16 +6,21 @@ import AppShell from '../components/AppShell';
 function RepSessions() {
   const [sessions, setSessions] = useState([]);
   const [busyId, setBusyId] = useState(null);
+  const [filter, setFilter] = useState('ALL');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const navigate = useNavigate();
 
   const load = async () => {
+    setLoading(true);
     try {
       const r = await api.get('/attendance/sessions/mine/');
       setSessions(r.data || []);
     } catch (e) {
       setError(e.response?.data?.detail || 'Unable to load your sessions.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,6 +63,12 @@ function RepSessions() {
     }
   };
 
+  const filteredSessions = sessions.filter((s) => {
+    if (filter === 'LIVE') return s.is_active;
+    if (filter === 'ENDED') return s.has_ended;
+    return true;
+  });
+
   return (
     <AppShell role="CLASS_REP">
       <div className="dashboard-head">
@@ -66,28 +77,51 @@ function RepSessions() {
           <h1>Sessions.</h1>
           <p>Start, end and export the lecture sessions created for your class.</p>
         </div>
-        <button className="button primary" onClick={() => navigate('/rep#new-session')}>+ New session</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button className="btn-refresh" onClick={load} disabled={loading}>
+            <span>↻</span> {loading ? 'Loading…' : 'Refresh'}
+          </button>
+          <button className="button primary" onClick={() => navigate('/rep#new-session')}>+ New session</button>
+        </div>
       </div>
 
       {(notice || error) && <div className={`notice ${notice ? 'success' : 'error'}`}>{notice || error}</div>}
+
+      <div className="filter-tabs">
+        <button className={`filter-tab ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>
+          All Sessions ({sessions.length})
+        </button>
+        <button className={`filter-tab ${filter === 'LIVE' ? 'active' : ''}`} onClick={() => setFilter('LIVE')}>
+          <span className="radar-dot" style={{ marginRight: '6px' }} /> Live Now ({sessions.filter(s => s.is_active).length})
+        </button>
+        <button className={`filter-tab ${filter === 'ENDED' ? 'active' : ''}`} onClick={() => setFilter('ENDED')}>
+          Ended ({sessions.filter(s => s.has_ended).length})
+        </button>
+      </div>
 
       <section className="panel">
         <div className="panel-head">
           <div>
             <span className="eyebrow">Your sessions</span>
-            <h2>{sessions.length} session{sessions.length === 1 ? '' : 's'}</h2>
+            <h2>{filteredSessions.length} session{filteredSessions.length === 1 ? '' : 's'}</h2>
           </div>
         </div>
 
-        {sessions.length === 0 ? (
+        {filteredSessions.length === 0 ? (
           <div className="empty-state">
             <span>○</span>
-            <h3>No sessions yet</h3>
-            <p>Create your first lecture session from the representative dashboard.</p>
+            <h3>No sessions found</h3>
+            <p>
+              {filter === 'LIVE'
+                ? 'No sessions are currently running.'
+                : filter === 'ENDED'
+                ? 'No ended sessions found.'
+                : 'Create your first lecture session from the representative dashboard.'}
+            </p>
           </div>
         ) : (
           <div className="session-table-list">
-            {sessions.map((session) => {
+            {filteredSessions.map((session) => {
               const state = session.has_ended ? 'Ended' : session.is_active ? 'Live' : 'Ready';
               const loading = busyId === session.id;
               const exporting = busyId === `export-${session.id}`;

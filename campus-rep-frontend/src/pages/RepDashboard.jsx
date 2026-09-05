@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
@@ -17,11 +17,25 @@ function RepDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   let decoded = {};
   try {
     const token = localStorage.getItem("access");
     decoded = token ? jwtDecode(token) : {};
-  } catch {}
+  } catch { }
+
+  const copyCode = () => {
+    if (!classCode) return;
+    navigator.clipboard.writeText(classCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareCodeToWhatsApp = () => {
+    if (!classCode) return;
+    const msg = `👋 Hello coursemates! Use this class signup code to join our class attendance workspace on CampusPulse:\n\n*${classCode}*\n\nSign up here: ${window.location.origin}/signup`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+  };
   const loadClassCode = async () => {
     try {
       const r = await api.get('/attendance/my-class-code/');
@@ -53,9 +67,9 @@ function RepDashboard() {
   );
   const avg = sessions.length
     ? Math.round(
-        sessions.reduce((n, s) => n + (s.attendee_count || 0), 0) /
-          sessions.length,
-      )
+      sessions.reduce((n, s) => n + (s.attendee_count || 0), 0) /
+      sessions.length,
+    )
     : 0;
   const regenerateCode = async () => {
     if (!window.confirm('Generate a new code? The old code will stop working immediately.')) return;
@@ -193,20 +207,28 @@ function RepDashboard() {
         <p className="muted-copy">
           Share this code with your coursemates so only they can create accounts for your class.
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
           <span
             style={{
-              fontSize: '24px',
-              fontWeight: 700,
+              fontSize: '22px',
+              fontWeight: 800,
               letterSpacing: '2px',
-              background: '#f1f5f9',
+              background: '#eff6ff',
+              color: '#1d4ed8',
               padding: '8px 16px',
               borderRadius: '10px',
+              border: '1px solid #bfdbfe',
             }}
           >
-            {classCode}
+            {classCode || 'Loading…'}
           </span>
-          <button className="button secondary small" onClick={regenerateCode}>
+          <button className="button secondary small" onClick={copyCode}>
+            {copied ? '✓ Copied' : 'Copy code'}
+          </button>
+          <button className="share-btn-whatsapp" onClick={shareCodeToWhatsApp}>
+            <span>Share to WhatsApp</span>
+          </button>
+          <button className="button secondary small" onClick={regenerateCode} style={{ marginLeft: 'auto' }}>
             Regenerate
           </button>
         </div>
@@ -250,7 +272,20 @@ function RepDashboard() {
               </select>
             </label>
             <label>
-              Radius
+              Radius (meters)
+              <div style={{ display: 'flex', gap: '6px', margin: '4px 0 6px', flexWrap: 'wrap' }}>
+                {[30, 50, 100, 200].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className={`filter-tab ${radius === r ? 'active' : ''}`}
+                    style={{ padding: '3px 9px', fontSize: '11px' }}
+                    onClick={() => setRadius(r)}
+                  >
+                    {r}m
+                  </button>
+                ))}
+              </div>
               <input
                 type="number"
                 value={radius}
@@ -260,7 +295,7 @@ function RepDashboard() {
               />
             </label>
             <button type="submit" className="button primary" disabled={loading}>
-              {loading ? 'Creating...' : 'Create session'}
+              {loading ? 'Creating session…' : 'Create & start session'}
             </button>
           </form>
         </section>

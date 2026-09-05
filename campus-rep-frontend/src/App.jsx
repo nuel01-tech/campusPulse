@@ -72,13 +72,25 @@ function App() {
         <button
           onClick={handleInstall}
           style={{
-            position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000,
-            background: '#E2E8F0', color: '#0F172A', padding: '10px 16px',
-            borderRadius: '12px', border: 'none', fontWeight: 600,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', cursor: 'pointer',
+            position: 'fixed',
+            bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+            right: '16px',
+            zIndex: 1000,
+            background: '#1e293b',
+            color: '#ffffff',
+            padding: '10px 16px',
+            borderRadius: '12px',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: '12px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
           }}
         >
-          ⬇ Install App
+          <span>⬇ Install App</span>
         </button>
       )}
     </BrowserRouter>

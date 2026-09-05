@@ -13,6 +13,7 @@ const icons = {
   menu: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>,
   file: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>,
   bell: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>,
+  location: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>,
 };
 
 function Logo() {
@@ -53,6 +54,22 @@ function AppShell({ role = 'STUDENT', children }) {
         ['/profile', 'Profile', 'user'],
         ['/security', 'Security', 'settings'],
         ['/preferences', 'Preferences', 'settings'],
+      ];
+
+  const bottomLinks = isRep
+    ? [
+        ['/rep', 'Home', 'grid'],
+        ['/rep/sessions', 'Sessions', 'calendar'],
+        ['/rep/announcements', 'Updates', 'megaphone'],
+        ['/rep/activity', 'Audit', 'clock'],
+        ['/profile', 'Profile', 'user'],
+      ]
+    : [
+        ['/student', 'Home', 'grid'],
+        ['/student/attendance', 'Check-in', 'location'],
+        ['/student/announcements', 'Updates', 'megaphone'],
+        ['/student/history', 'History', 'clock'],
+        ['/profile', 'Profile', 'user'],
       ];
 
   const [unread, setUnread] = useState(0);
@@ -96,11 +113,31 @@ function AppShell({ role = 'STUDENT', children }) {
           <div className="topbar-title"><span>Olabisi Onabanjo University</span><strong>{isRep ? 'Representative workspace' : 'Student workspace'}</strong></div>
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Notifications" onClick={() => navigate('/notifications')}>{icons.bell}{unread > 0 && <span className="notification-count">{unread > 9 ? '9+' : unread}</span>}</button>
-            <button className="profile-button" onClick={() => navigate('/settings')}>{profile?.profile_picture ? <img className="avatar small profile-avatar-image" src={profile.profile_picture} alt="" /> : <span className="avatar small">{username.slice(0, 1).toUpperCase()}</span>}<span className="profile-name">{username}</span></button>
+            <button className="profile-button" onClick={() => navigate('/profile')}>{profile?.profile_picture ? <img className="avatar small profile-avatar-image" src={profile.profile_picture} alt="" /> : <span className="avatar small">{username.slice(0, 1).toUpperCase()}</span>}<span className="profile-name">{username}</span></button>
           </div>
         </header>
         <div className="page-content">{children}</div>
       </main>
+
+      {/* Persistent Mobile Bottom Navigation */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
+        {bottomLinks.map(([to, label, icon]) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/student' || to === '/rep'}
+            className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="bottom-nav-icon">
+              {icons[icon]}
+              {label === 'Updates' && unread > 0 && (
+                <span className="bottom-nav-badge">{unread > 9 ? '9+' : unread}</span>
+              )}
+            </span>
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }

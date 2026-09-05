@@ -497,3 +497,29 @@ class MyClassCodeView(APIView):
         code_obj.code = generate_class_code()
         code_obj.save()
         return Response({"code": code_obj.code})
+class MyHistoryView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        sessions = LectureSession.objects.filter(
+            department=request.user.department,
+            level=request.user.level,
+        ).order_by('-created_at')
+
+        attended_ids = set(
+            AttendanceRecord.objects.filter(
+                student=request.user, session__in=sessions
+            ).values_list('session_id', flat=True)
+        )
+
+        data = [
+            {
+                'id': s.id,
+                'course_code': s.course_code,
+                'venue_name': s.venue_name,
+                'date': s.created_at,
+                'status': 'attended' if s.id in attended_ids else 'missed',
+            }
+            for s in sessions
+        ]
+        return Response(data)

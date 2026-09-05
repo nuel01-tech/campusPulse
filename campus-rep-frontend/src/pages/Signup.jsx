@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 function Signup() {
@@ -18,13 +18,28 @@ const [termsAccepted, setTermsAccepted] = useState(false);
 const [error, setError] = useState('');
 const navigate = useNavigate();
 
-useEffect(() => {
-  api
-    .get('/accounts/departments/')
-    .then((r) => setDepartments(r.data))
-    .catch(() => setError('Failed to load departments.'))
-    .finally(() => setLoadingDepartments(false));
-}, []);
+  const loadDepartments = async () => {
+    setLoadingDepartments(true);
+    try {
+      const r = await api.get('/accounts/departments/');
+      const data = r.data || [];
+      setDepartments(data);
+      if (data.length === 0) {
+        setError('No departments found on the server. Please check backend database.');
+      } else {
+        setError('');
+      }
+    } catch {
+      setError('Failed to load departments. Please check server connection.');
+    } finally {
+      setLoadingDepartments(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDepartments();
+  }, []);
+
   const setField = (k, v) => setForm({ ...form, [k]: v });
   const submit = async (e) => {
     e.preventDefault();
@@ -96,15 +111,34 @@ useEffect(() => {
               Email
               <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} required />
             </label>
-           <label>
-  Department
-  <select value={form.department} onChange={(e) => setField('department', e.target.value)} required disabled={loadingDepartments}>
-    <option value="">{loadingDepartments ? 'Loading departments…' : 'Select department'}</option>
-    {departments.map((d) => (
-      <option key={d.id} value={d.id}>{d.name}</option>
-    ))}
-  </select>
-</label>
+            <label>
+              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Department</span>
+                {departments.length === 0 && !loadingDepartments && (
+                  <button
+                    type="button"
+                    onClick={loadDepartments}
+                    style={{ border: 'none', background: 'none', color: '#1f5eff', fontSize: '11px', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    ↻ Retry loading
+                  </button>
+                )}
+              </span>
+              <select value={form.department} onChange={(e) => setField('department', e.target.value)} required disabled={loadingDepartments}>
+                <option value="">
+                  {loadingDepartments
+                    ? 'Loading departments…'
+                    : departments.length === 0
+                    ? 'No departments loaded (tap retry)'
+                    : 'Select department'}
+                </option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} {d.faculty ? `(${d.faculty})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               Level
               <select value={form.level} onChange={(e) => setField('level', e.target.value)} required>
