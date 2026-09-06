@@ -74,7 +74,11 @@ function StudentAttendance() {
           <p>Your GPS location verifies that you are present within the designated lecture hall.</p>
         </div>
         <button className="btn-refresh" onClick={loadSessions} disabled={loading}>
-          <span>↻</span> {loading ? 'Checking…' : 'Refresh sessions'}
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+            <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+          {loading ? 'Checking…' : 'Refresh sessions'}
         </button>
       </div>
 
@@ -90,7 +94,10 @@ function StudentAttendance() {
             <span className="eyebrow">Live sessions</span>
             <h2>Available now ({sessions.length})</h2>
           </div>
-          <span className="secure-label">⌖ GPS-verified check-in</span>
+          <span className="secure-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
+            GPS-verified check-in
+          </span>
         </div>
 
         {loading ? (
@@ -99,7 +106,7 @@ function StudentAttendance() {
           </div>
         ) : sessions.length === 0 ? (
           <div className="empty-state">
-            <span>○</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /></svg>
             <h3>No classes currently live</h3>
             <p>When your class rep initiates an attendance session, it will display here automatically.</p>
             <button className="btn-refresh" onClick={loadSessions} style={{ marginTop: '14px' }}>
@@ -116,7 +123,8 @@ function StudentAttendance() {
                 <div className="session-info">
                   <strong>{s.course_code}</strong>
                   <span>
-                    📍 {s.venue_name} · {s.level} Level · {s.radius_meters || 50}m radius
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
+                    {s.venue_name} · {s.level} Level · {s.radius_meters || 50}m radius
                   </span>
                 </div>
                 <div className="session-status">
@@ -137,7 +145,9 @@ function StudentAttendance() {
       </section>
 
       <section className="info-card">
-        <div className="info-icon">⌖</div>
+        <div className="info-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
+        </div>
         <div>
           <strong>Location verification tips</strong>
           <p>

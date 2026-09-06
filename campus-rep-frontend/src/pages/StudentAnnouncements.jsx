@@ -49,7 +49,11 @@ function StudentAnnouncements() {
           <p>Important updates, assignments and venue changes from your class representative.</p>
         </div>
         <button className="btn-refresh" onClick={loadAnnouncements} disabled={loading}>
-          <span>↻</span> {loading ? 'Loading…' : 'Refresh'}
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+            <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+          {loading ? 'Loading…' : 'Refresh'}
         </button>
       </div>
 
@@ -83,19 +87,22 @@ function StudentAnnouncements() {
           className={`filter-tab ${category === 'ASSIGNMENT' ? 'active' : ''}`}
           onClick={() => setCategory('ASSIGNMENT')}
         >
-          📝 Assignments ({items.filter((i) => i.category === 'ASSIGNMENT').length})
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+          Assignments ({items.filter((i) => i.category === 'ASSIGNMENT').length})
         </button>
         <button
           className={`filter-tab ${category === 'VENUE_CHANGE' ? 'active' : ''}`}
           onClick={() => setCategory('VENUE_CHANGE')}
         >
-          📍 Venue Changes ({items.filter((i) => i.category === 'VENUE_CHANGE').length})
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
+          Venue Changes ({items.filter((i) => i.category === 'VENUE_CHANGE').length})
         </button>
         <button
           className={`filter-tab ${category === 'GENERAL' ? 'active' : ''}`}
           onClick={() => setCategory('GENERAL')}
         >
-          📢 General ({items.filter((i) => i.category === 'GENERAL').length})
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+          General ({items.filter((i) => i.category === 'GENERAL').length})
         </button>
       </div>
 
@@ -119,11 +126,13 @@ function StudentAnnouncements() {
             <article className="panel announcement-detail" key={a.id} style={{ position: 'relative' }}>
               <div className="announcement-meta">
                 <span>
-                  {a.category === 'ASSIGNMENT'
-                    ? '📝 Assignment'
-                    : a.category === 'VENUE_CHANGE'
-                    ? '📍 Venue Change'
-                    : '📢 Department Update'}
+                  {a.category === 'ASSIGNMENT' ? (
+                    <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>Assignment</>
+                  ) : a.category === 'VENUE_CHANGE' ? (
+                    <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>Venue Change</>
+                  ) : (
+                    <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>Department Update</>
+                  )}
                 </span>
                 <time>{new Date(a.created_at).toLocaleDateString()}</time>
               </div>
@@ -132,7 +141,8 @@ function StudentAnnouncements() {
 
               {a.due_date && (
                 <div style={{ marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#92400e', padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700 }}>
-                  <span>⏳ Submission Deadline: {new Date(a.due_date).toLocaleDateString()}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                  <span>Submission Deadline: {new Date(a.due_date).toLocaleDateString()}</span>
                 </div>
               )}
 

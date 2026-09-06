@@ -70,7 +70,11 @@ function StudentHistory() {
           <p>Track every lecture session, verify your presence, and monitor exam eligibility.</p>
         </div>
         <button className="btn-refresh" onClick={loadData} disabled={loading}>
-          <span>↻</span> {loading ? 'Refreshing…' : 'Refresh'}
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+            <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+            <path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+          {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
@@ -85,9 +89,11 @@ function StudentHistory() {
             <i style={{ width: `${Math.min(rate, 100)}%` }} />
           </div>
           <small>
-            {isEligible
-              ? '✓ Eligible for semester examinations'
-              : `⚠️ Below ${stats?.eligibility_threshold ?? 70}% requirement`}
+            {isEligible ? (
+              <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px', color: '#16a34a' }}><polyline points="20 6 9 17 4 12" /></svg>Eligible for semester examinations</>
+            ) : (
+              <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px', color: '#d97706' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>Below {stats?.eligibility_threshold ?? 70}% requirement</>
+            )}
           </small>
         </div>
 
@@ -139,13 +145,15 @@ function StudentHistory() {
             className={`filter-tab ${filter === 'ATTENDED' ? 'active' : ''}`}
             onClick={() => setFilter('ATTENDED')}
           >
-            ✓ Attended ({attendedCount})
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px', color: '#16a34a' }}><polyline points="20 6 9 17 4 12" /></svg>
+            Attended ({attendedCount})
           </button>
           <button
             className={`filter-tab ${filter === 'MISSED' ? 'active' : ''}`}
             onClick={() => setFilter('MISSED')}
           >
-            ✕ Missed ({missedCount})
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px', color: '#dc2626' }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            Missed ({missedCount})
           </button>
         </div>
 
@@ -155,7 +163,7 @@ function StudentHistory() {
           </div>
         ) : filteredHistory.length === 0 ? (
           <div className="empty-state">
-            <span>○</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /></svg>
             <h3>No classes found</h3>
             <p>
               {search
@@ -197,7 +205,11 @@ function StudentHistory() {
                   </div>
 
                   <span className={`history-badge ${isPresent ? 'present' : 'absent'}`}>
-                    {isPresent ? '✓ Attended' : '✕ Missed'}
+                    {isPresent ? (
+                      <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><polyline points="20 6 9 17 4 12" /></svg>Attended</>
+                    ) : (
+                      <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>Missed</>
+                    )}
                   </span>
                 </div>
               );

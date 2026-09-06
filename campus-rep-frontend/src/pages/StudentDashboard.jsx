@@ -110,7 +110,11 @@ function StudentDashboard() {
         </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <button className="btn-refresh" onClick={loadData} disabled={loading}>
-            <span>↻</span> {loading ? "Refreshing…" : "Refresh"}
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+              <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+              <path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+            </svg>
+            {loading ? "Refreshing…" : "Refresh"}
           </button>
           <button
             className="button secondary"
@@ -142,16 +146,30 @@ function StudentDashboard() {
             {activeSessions[0].course_code}
           </h2>
           <div className="live-hero-subtitle">
-            <span>📍 {activeSessions[0].venue_name}</span>
-            <span>🎓 {activeSessions[0].level} Level</span>
-            <span>🎯 Radius: {activeSessions[0].radius_meters || 50}m</span>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
+              {activeSessions[0].venue_name}
+            </span>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
+              {activeSessions[0].level} Level
+            </span>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>
+              Radius: {activeSessions[0].radius_meters || 50}m
+            </span>
           </div>
           <button
             className="live-checkin-btn"
             disabled={checking === activeSessions[0].id}
             onClick={() => handleCheckIn(activeSessions[0].id)}
           >
-            {checking === activeSessions[0].id ? "Verifying GPS Location…" : "✓ Tap to Check In with GPS"}
+            {checking === activeSessions[0].id ? "Verifying GPS Location…" : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '5px' }}><polyline points="20 6 9 17 4 12" /></svg>
+                Tap to Check In with GPS
+              </>
+            )}
           </button>
         </div>
       )}
@@ -160,7 +178,7 @@ function StudentDashboard() {
       <div className="quick-action-grid">
         <div className="action-tile" onClick={() => navigate("/student/attendance")}>
           <div className="action-tile-icon" style={{ background: "#ecfdf5", color: "#059669" }}>
-            📍
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
           </div>
           <div>
             <strong>Live Check-in</strong>
@@ -170,7 +188,7 @@ function StudentDashboard() {
 
         <div className="action-tile" onClick={() => navigate("/student/history")}>
           <div className="action-tile-icon" style={{ background: "#eff6ff", color: "#2563eb" }}>
-            📋
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /><line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="15" y2="16" /></svg>
           </div>
           <div>
             <strong>Class History</strong>
@@ -180,7 +198,7 @@ function StudentDashboard() {
 
         <div className="action-tile" onClick={() => navigate("/student/announcements")}>
           <div className="action-tile-icon" style={{ background: "#fef3c7", color: "#d97706" }}>
-            📢
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
           </div>
           <div>
             <strong>Announcements</strong>
@@ -190,7 +208,7 @@ function StudentDashboard() {
 
         <div className="action-tile" onClick={() => navigate("/documents")}>
           <div className="action-tile-icon" style={{ background: "#f3e8ff", color: "#7c3aed" }}>
-            📁
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
           </div>
           <div>
             <strong>Course Docs</strong>
@@ -215,9 +233,14 @@ function StudentDashboard() {
         </div>
         <div className="stat-card">
           <span>Current streak</span>
-          <strong>🔥 {stats?.streak ?? 0}</strong>
+          <strong>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px', color: '#f97316' }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+            {stats?.streak ?? 0}
+          </strong>
           <small>consecutive classes present</small>
-          <div className="stat-mark">↗</div>
+          <div className="stat-mark">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
+          </div>
         </div>
         <div className="stat-card">
           <span>Active classes</span>
@@ -246,7 +269,7 @@ function StudentDashboard() {
           </div>
           {activeSessions.length === 0 ? (
             <div className="empty-state">
-              <span>○</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /></svg>
               <h3>No classes live right now</h3>
               <p>When your class representative starts attendance, it will appear here instantly.</p>
               <button
@@ -301,7 +324,7 @@ function StudentDashboard() {
           </div>
           {announcements.length === 0 ? (
             <div className="empty-state compact">
-              <span>—</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
               <p>No new announcements yet.</p>
             </div>
           ) : (
@@ -310,11 +333,13 @@ function StudentDashboard() {
                 <article key={a.id}>
                   <div className="announcement-meta">
                     <span>
-                      {a.category === "ASSIGNMENT"
-                        ? "📝 Assignment"
-                        : a.category === "VENUE_CHANGE"
-                        ? "📍 Venue Change"
-                        : "📢 Department update"}
+                      {a.category === "ASSIGNMENT" ? (
+                        <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>Assignment</>
+                      ) : a.category === "VENUE_CHANGE" ? (
+                        <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>Venue Change</>
+                      ) : (
+                        <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>Department update</>
+                      )}
                     </span>
                     <time>{new Date(a.created_at).toLocaleDateString()}</time>
                   </div>
@@ -322,7 +347,8 @@ function StudentDashboard() {
                   <p>{a.body}</p>
                   {a.due_date && (
                     <p style={{ fontSize: "11px", color: "#d97706", fontWeight: 700, margin: "6px 0" }}>
-                      ⏳ Due: {new Date(a.due_date).toLocaleDateString()}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      Due: {new Date(a.due_date).toLocaleDateString()}
                     </p>
                   )}
                   <div style={{ marginTop: "8px" }}>
