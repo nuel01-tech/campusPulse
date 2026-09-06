@@ -69,6 +69,22 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return value
 
 
+class ClassmateSerializer(serializers.ModelSerializer):
+    """Public-safe profile data shown on the classmates directory."""
+    department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
+    role_label = serializers.CharField(source='get_role_display', read_only=True)
+    level_label = serializers.CharField(source='get_level_display', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'first_name', 'last_name',
+            'profile_picture', 'role', 'role_label',
+            'department_name', 'level', 'level_label',
+        ]
+        read_only_fields = fields
+
+
 class PreferencesSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

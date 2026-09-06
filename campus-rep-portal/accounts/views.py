@@ -19,7 +19,7 @@ from .models import Department, PushSubscription, User
 from .push import send_push_to_user
 from .serializers import (
     MyTokenObtainPairSerializer, PreferencesSerializer, SignupSerializer,
-    UserProfileSerializer,
+    UserProfileSerializer, ClassmateSerializer,
 )
 
 
@@ -211,3 +211,25 @@ class SaveSubscriptionView(APIView):
         )
         return Response({'detail': 'Subscribed to notifications.'})
 
+
+class ClassmatesView(generics.ListAPIView):
+    """Return all students in the same department and level as the requesting user."""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ClassmateSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = User.objects.filter(
+            department=user.department,
+            level=user.level,
+        ).exclude(pk=user.pk).order_by('first_name', 'last_name', 'username')
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(username__icontains=search) |
+                Q(matric_number__icontains=search)
+            )
+        return qs

@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    ChangePasswordView, DepartmentListView, ForgotPasswordView, MyProfileView,
+    ChangePasswordView, ClassmatesView, DepartmentListView, ForgotPasswordView, MyProfileView,
     PreferencesView, ResetPasswordView, SaveSubscriptionView, SignupView, UpdateMatricView,
 )
 
@@ -14,4 +14,5 @@ urlpatterns = [
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('save-subscription/', SaveSubscriptionView.as_view(), name='save-subscription'),
+    path('classmates/', ClassmatesView.as_view(), name='classmates'),
 ]

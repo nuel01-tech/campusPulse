@@ -19,6 +19,7 @@ import RepSessions from './pages/RepSessions';
 import RepAnnouncements from './pages/RepAnnouncements';
 import RepActivity from './pages/RepActivity';
 import Documents from './pages/Documents';
+import Classmates from './pages/Classmates';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
         <Route path="/student/attendance" element={<ProtectedRoute allowedRole="STUDENT"><StudentAttendance /></ProtectedRoute>} />
         <Route path="/student/announcements" element={<ProtectedRoute allowedRole="STUDENT"><StudentAnnouncements /></ProtectedRoute>} />
         <Route path="/student/history" element={<ProtectedRoute allowedRole="STUDENT"><StudentHistory /></ProtectedRoute>} />
+        <Route path="/student/classmates" element={<ProtectedRoute allowedRole="STUDENT"><Classmates /></ProtectedRoute>} />
         <Route path="/student/*" element={<ProtectedRoute allowedRole="STUDENT"><StudentDashboard /></ProtectedRoute>} />
         <Route path="/rep" element={<ProtectedRoute allowedRole="CLASS_REP"><RepDashboard /></ProtectedRoute>} />
         <Route path="/rep/sessions" element={<ProtectedRoute allowedRole="CLASS_REP"><RepSessions /></ProtectedRoute>} />

@@ -14,6 +14,7 @@ const icons = {
   file: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>,
   bell: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>,
   location: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>,
+  users: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
 };
 
 function Logo() {
@@ -49,6 +50,7 @@ function AppShell({ role = 'STUDENT', children }) {
         ['/student/attendance', 'Attendance', 'calendar'],
         ['/student/announcements', 'Announcements', 'megaphone'],
         ['/student/history', 'History', 'clock'],
+        ['/student/classmates', 'Classmates', 'users'],
         ['/notifications', 'Notifications', 'bell'],
         ['/documents', 'Documents', 'file'],
         ['/profile', 'Profile', 'user'],
@@ -68,7 +70,7 @@ function AppShell({ role = 'STUDENT', children }) {
         ['/student', 'Home', 'grid'],
         ['/student/attendance', 'Check-in', 'location'],
         ['/student/announcements', 'Updates', 'megaphone'],
-        ['/student/history', 'History', 'clock'],
+        ['/student/classmates', 'Classmates', 'users'],
         ['/profile', 'Profile', 'user'],
       ];
 
