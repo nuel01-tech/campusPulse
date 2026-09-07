@@ -63,6 +63,26 @@ function RepSessions() {
     }
   };
 
+  const deleteSession = async (session) => {
+    const warning = session.is_active
+      ? 'This session is currently LIVE. Deleting it will remove it and its attendance data permanently — students will lose any check-ins already recorded. Continue?'
+      : 'Delete this session permanently? This also removes its attendance records and cannot be undone.';
+    if (!window.confirm(warning)) return;
+
+    setBusyId(`delete-${session.id}`);
+    setError('');
+    setNotice('');
+    try {
+      await api.delete(`/attendance/sessions/${session.id}/delete/`);
+      setNotice('Session deleted.');
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Unable to delete the session.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const filteredSessions = sessions.filter((s) => {
     if (filter === 'LIVE') return s.is_active;
     if (filter === 'ENDED') return s.has_ended;
@@ -123,8 +143,9 @@ function RepSessions() {
           <div className="session-table-list">
             {filteredSessions.map((session) => {
               const state = session.has_ended ? 'Ended' : session.is_active ? 'Live' : 'Ready';
-              const loading = busyId === session.id;
+              const isBusy = busyId === session.id;
               const exporting = busyId === `export-${session.id}`;
+              const deleting = busyId === `delete-${session.id}`;
               return (
                 <article className="rep-session-card" key={session.id}>
                   <div className="rep-session-main">
@@ -140,12 +161,15 @@ function RepSessions() {
                   </div>
                   <div className="rep-session-actions">
                     {!session.has_ended && (
-                      <button className={`button ${session.is_active ? 'secondary' : 'primary'} small`} disabled={loading} onClick={() => toggleSession(session)}>
-                        {loading ? 'Updating…' : session.is_active ? 'End session' : 'Start session'}
+                      <button className={`button ${session.is_active ? 'secondary' : 'primary'} small`} disabled={isBusy} onClick={() => toggleSession(session)}>
+                        {isBusy ? 'Updating…' : session.is_active ? 'End session' : 'Start session'}
                       </button>
                     )}
                     <button className="button secondary small" disabled={exporting} onClick={() => exportSession(session)}>
                       {exporting ? 'Exporting…' : 'Export Excel'}
+                    </button>
+                    <button className="button danger small" disabled={deleting} onClick={() => deleteSession(session)}>
+                      {deleting ? 'Deleting…' : 'Delete'}
                     </button>
                   </div>
                 </article>
