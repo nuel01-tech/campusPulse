@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import LoadingSkeleton from '../components/LoadingSkeleton';
 
 function RepSessions() {
   const [sessions, setSessions] = useState([]);
   const [busyId, setBusyId] = useState(null);
   const [filter, setFilter] = useState('ALL');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const navigate = useNavigate();
@@ -127,7 +128,7 @@ function RepSessions() {
           </div>
         </div>
 
-        {filteredSessions.length === 0 ? (
+        {loading ? <LoadingSkeleton rows={5} /> : filteredSessions.length === 0 ? (
           <div className="empty-state">
             <span>○</span>
             <h3>No sessions found</h3>

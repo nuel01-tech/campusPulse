@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import LoadingSkeleton from '../components/LoadingSkeleton';
 import { jwtDecode } from 'jwt-decode';
 
 let currentRole = 'STUDENT';
@@ -289,9 +290,7 @@ function Classmates() {
       </div>
 
       {loading ? (
-        <div className="empty-state">
-          <p>Loading your classmates…</p>
-        </div>
+        <LoadingSkeleton rows={6} />
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <svg

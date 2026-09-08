@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import LoadingSkeleton from '../components/LoadingSkeleton';
 
 function StudentHistory() {
   const [history, setHistory] = useState([]);
@@ -158,9 +159,7 @@ function StudentHistory() {
         </div>
 
         {loading ? (
-          <div className="empty-state">
-            <p>Loading attendance history…</p>
-          </div>
+          <LoadingSkeleton rows={5} />
         ) : filteredHistory.length === 0 ? (
           <div className="empty-state">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /></svg>

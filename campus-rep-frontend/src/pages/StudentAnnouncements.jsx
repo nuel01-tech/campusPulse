@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import LoadingSkeleton from '../components/LoadingSkeleton';
 
 function StudentAnnouncements() {
   const [items, setItems] = useState([]);
@@ -108,9 +109,7 @@ function StudentAnnouncements() {
 
       <div className="announcement-page-list">
         {loading ? (
-          <section className="panel empty-state">
-            <p>Loading announcements…</p>
-          </section>
+          <section className="panel"><LoadingSkeleton rows={4} /></section>
         ) : filteredItems.length === 0 ? (
           <section className="panel empty-state">
             <span>—</span>

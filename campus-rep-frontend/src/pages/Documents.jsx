@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import LoadingSkeleton from '../components/LoadingSkeleton';
 
 const formatSize = (bytes) => {
   if (!bytes) return 'PDF';
@@ -141,7 +142,7 @@ function Documents() {
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search title, course or uploader…" />
             <button className="button secondary small" type="submit">Search</button>
           </form>
-          {loading ? <div className="empty-state compact"><p>Loading documents…</p></div> : documents.length === 0 ? (
+          {loading ? <LoadingSkeleton rows={4} /> : documents.length === 0 ? (
             <div className="empty-state"><span>PDF</span><h3>No documents found</h3><p>Be the first to share useful course material with your class.</p></div>
           ) : (
             <div className="document-list">

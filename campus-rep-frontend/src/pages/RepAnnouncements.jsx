@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import AppShell from '../components/AppShell';
+import LoadingSkeleton from '../components/LoadingSkeleton';
 
 function RepAnnouncements() {
   const [announcements, setAnnouncements] = useState([]);
@@ -165,9 +166,7 @@ function RepAnnouncements() {
         </div>
 
         {loading ? (
-          <div className="empty-state">
-            <p>Loading announcement feed…</p>
-          </div>
+          <LoadingSkeleton rows={4} />
         ) : announcements.length === 0 ? (
           <div className="empty-state">
             <span>—</span>

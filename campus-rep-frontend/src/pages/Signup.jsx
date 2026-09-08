@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 function Signup() {
@@ -14,25 +14,41 @@ function Signup() {
   });
 const [departments, setDepartments] = useState([]);
 const [loadingDepartments, setLoadingDepartments] = useState(true);
+const [retryMessage, setRetryMessage] = useState('');
 const [termsAccepted, setTermsAccepted] = useState(false);
 const [error, setError] = useState('');
 const navigate = useNavigate();
+const attemptRef = useRef(0);
 
-  const loadDepartments = async () => {
+  const loadDepartments = async (isAutoRetry = false) => {
     setLoadingDepartments(true);
+    if (!isAutoRetry) {
+      attemptRef.current = 0;
+      setError('');
+    }
     try {
       const r = await api.get('/accounts/departments/');
       const data = r.data || [];
       setDepartments(data);
+      setRetryMessage('');
       if (data.length === 0) {
         setError('No departments found on the server. Please check backend database.');
       } else {
         setError('');
       }
     } catch {
-      setError('Failed to load departments. Please check server connection.');
+      attemptRef.current += 1;
+      if (attemptRef.current < 4) {
+        setRetryMessage(`Server is waking up, retrying… (${attemptRef.current}/3)`);
+        setTimeout(() => loadDepartments(true), 3000);
+        return;
+      }
+      setRetryMessage('');
+      setError('Taking longer than usual to load departments. Tap retry below.');
     } finally {
-      setLoadingDepartments(false);
+      if (attemptRef.current === 0 || attemptRef.current >= 4) {
+        setLoadingDepartments(false);
+      }
     }
   };
 
@@ -117,7 +133,7 @@ const navigate = useNavigate();
                 {departments.length === 0 && !loadingDepartments && (
                   <button
                     type="button"
-                    onClick={loadDepartments}
+                    onClick={() => loadDepartments(false)}
                     style={{ border: 'none', background: 'none', color: '#1f5eff', fontSize: '11px', cursor: 'pointer', fontWeight: 700 }}
                   >
                     ↻ Retry loading
@@ -168,7 +184,11 @@ const navigate = useNavigate();
               <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} required />
               <span>I agree to the <Link to="/terms">Terms & Conditions</Link>.</span>
             </label>
-           {loadingDepartments && <div className="field-hint full">Loading the department list…</div>}
+           {loadingDepartments && (
+             <div className="field-hint full">
+               {retryMessage || 'Loading the department list…'}
+             </div>
+           )}
             {error && <div className="form-error full">{error}</div>}
             <button type="submit" className="button primary full">
               Create account
