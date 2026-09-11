@@ -35,7 +35,7 @@ class DepartmentListView(generics.ListAPIView):
     serializer_class = DeptSerializer
 
 
-class MyProfileView(generics.RetrieveUpdateAPIView):
+class MyProfileView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = UserProfileSerializer
 

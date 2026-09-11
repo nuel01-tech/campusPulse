@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
+import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 function RepDashboard() {
+  const navigate = useNavigate();
   const [courseCode, setCourseCode] = useState("");
   const [classCode, setClassCode] = useState("");
   const [venueName, setVenueName] = useState("");
@@ -241,7 +243,7 @@ function RepDashboard() {
         </div>
       </section>
       <div className="content-grid rep-grid">
-        <section className="panel" id="new-session">
+        <section className="panel" id="create-session">
           <div className="panel-head">
             <div>
               <span className="eyebrow">Session setup</span>

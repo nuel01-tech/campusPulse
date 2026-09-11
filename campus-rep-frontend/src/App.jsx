@@ -67,31 +67,12 @@ function App() {
         <Route path="/rep/sessions" element={<ProtectedRoute allowedRole="CLASS_REP"><RepSessions /></ProtectedRoute>} />
         <Route path="/rep/announcements" element={<ProtectedRoute allowedRole="CLASS_REP"><RepAnnouncements /></ProtectedRoute>} />
         <Route path="/rep/activity" element={<ProtectedRoute allowedRole="CLASS_REP"><RepActivity /></ProtectedRoute>} />
+        <Route path="/rep/classmates" element={<ProtectedRoute allowedRole="CLASS_REP"><Classmates /></ProtectedRoute>} />
         <Route path="/rep/*" element={<ProtectedRoute allowedRole="CLASS_REP"><RepDashboard /></ProtectedRoute>} />
       </Routes>
 
       {installPrompt && (
-        <button
-          onClick={handleInstall}
-          style={{
-            position: 'fixed',
-            bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
-            right: '16px',
-            zIndex: 1000,
-            background: '#1e293b',
-            color: '#ffffff',
-            padding: '10px 16px',
-            borderRadius: '12px',
-            border: 'none',
-            fontWeight: 700,
-            fontSize: '12px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
+        <button className="install-app-button" onClick={handleInstall}>
           <span>⬇ Install App</span>
         </button>
       )}

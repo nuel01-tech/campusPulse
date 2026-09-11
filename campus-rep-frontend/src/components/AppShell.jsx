@@ -39,6 +39,7 @@ function AppShell({ role = 'STUDENT', children }) {
         ['/rep/sessions', 'Sessions', 'calendar'],
         ['/rep/announcements', 'Announcements', 'megaphone'],
         ['/rep/activity', 'Activity log', 'clock'],
+        ['/rep/classmates', 'Classmates', 'users'],
         ['/notifications', 'Notifications', 'bell'],
         ['/documents', 'Documents', 'file'],
         ['/profile', 'Profile', 'user'],
@@ -64,6 +65,7 @@ function AppShell({ role = 'STUDENT', children }) {
         ['/rep/sessions', 'Sessions', 'calendar'],
         ['/rep/announcements', 'Updates', 'megaphone'],
         ['/rep/activity', 'Audit', 'clock'],
+        ['/rep/classmates', 'Classmates', 'users'],
         ['/profile', 'Profile', 'user'],
       ]
     : [

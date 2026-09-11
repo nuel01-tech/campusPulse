@@ -78,7 +78,7 @@ class ClassmateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'first_name', 'last_name',
+            'id', 'username', 'first_name', 'last_name', 'email', 'phone_number', 'matric_number',
             'profile_picture', 'role', 'role_label',
             'department_name', 'level', 'level_label',
         ]

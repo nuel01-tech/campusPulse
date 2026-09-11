@@ -70,6 +70,9 @@ function Avatar({ person, size = 56 }) {
 function ClassmateCard({ person }) {
   const isRep = person.role === 'CLASS_REP';
   const fullName = [person.first_name, person.last_name].filter(Boolean).join(' ') || person.username;
+  const rawPhone = (person.phone_number || '').replace(/\D/g, '');
+  const whatsappNumber = rawPhone.startsWith('00') ? rawPhone.slice(2) : rawPhone.startsWith('0') ? `234${rawPhone.slice(1)}` : rawPhone;
+  const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : '';
 
   return (
     <div
@@ -89,7 +92,15 @@ function ClassmateCard({ person }) {
           : '0 2px 12px rgba(0,0,0,0.05)',
         textAlign: 'center',
         transition: 'transform 0.18s ease, box-shadow 0.18s ease',
-        cursor: 'default',
+        cursor: whatsappUrl ? 'pointer' : 'default',
+      }}
+      role={whatsappUrl ? 'link' : undefined}
+      tabIndex={whatsappUrl ? 0 : undefined}
+      onClick={(event) => {
+        if (whatsappUrl && !event.target.closest('a')) window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      }}
+      onKeyDown={(event) => {
+        if (whatsappUrl && (event.key === 'Enter' || event.key === ' ')) window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-3px)';
@@ -157,6 +168,11 @@ function ClassmateCard({ person }) {
         </span>
       </div>
 
+      <div style={{ width: '100%', textAlign: 'left', display: 'grid', gap: '4px', fontSize: '11px', color: '#64748b' }}>
+        <span><strong style={{ color: '#334155' }}>Email:</strong> {person.email || 'Not added'}</span>
+        <span><strong style={{ color: '#334155' }}>Matric:</strong> {person.matric_number || 'Not added'}</span>
+      </div>
+
       <div
         style={{
           fontSize: '10px',
@@ -170,6 +186,20 @@ function ClassmateCard({ person }) {
       >
         {person.level_label || `${person.level} Level`}
       </div>
+
+      {whatsappUrl ? (
+        <a
+          className="button secondary small"
+          href={whatsappUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{ width: '100%', justifyContent: 'center', boxSizing: 'border-box', textDecoration: 'none' }}
+        >
+          WhatsApp DM
+        </a>
+      ) : (
+        <span style={{ fontSize: '10px', color: '#94a3b8' }}>WhatsApp unavailable</span>
+      )}
     </div>
   );
 }
@@ -204,7 +234,9 @@ function Classmates() {
       (p) =>
         p.first_name?.toLowerCase().includes(q) ||
         p.last_name?.toLowerCase().includes(q) ||
-        p.username?.toLowerCase().includes(q)
+        p.username?.toLowerCase().includes(q) ||
+        p.email?.toLowerCase().includes(q) ||
+        p.matric_number?.toLowerCase().includes(q)
     );
   }, [classmates, search]);
 
@@ -272,7 +304,7 @@ function Classmates() {
           </svg>
           <input
             type="text"
-            placeholder="Search by name or username…"
+            placeholder="Search by name, email or matric number…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -313,7 +345,7 @@ function Classmates() {
           <h3>{search ? 'No classmates match your search.' : 'No classmates found.'}</h3>
           <p>
             {search
-              ? 'Try a different name or username.'
+              ? 'Try a different name, email or matric number.'
               : 'Your classmates will appear here once they create their accounts using your class code.'}
           </p>
         </div>

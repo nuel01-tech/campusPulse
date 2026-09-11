@@ -102,7 +102,7 @@ function RepSessions() {
           <button className="btn-refresh" onClick={load} disabled={loading}>
             <span>↻</span> {loading ? 'Loading…' : 'Refresh'}
           </button>
-          <button className="button primary" onClick={() => navigate('/rep#new-session')}>+ New session</button>
+          <button className="button primary" onClick={() => navigate('/rep#create-session')}>+ New session</button>
         </div>
       </div>
 

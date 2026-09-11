@@ -12,6 +12,7 @@ function Profile() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [pictureSaving, setPictureSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileRef = useRef(null);
   let role = 'STUDENT';
   try { const t = localStorage.getItem('access'); role = t ? jwtDecode(t).role : 'STUDENT'; } catch {}
@@ -74,6 +75,20 @@ function Profile() {
     setPicture(file); setPreview(URL.createObjectURL(file)); setError('');
   };
 
+  const deleteAccount = async () => {
+    if (!window.confirm('Delete your representative account permanently? This cannot be undone.')) return;
+    setDeleting(true); setError('');
+    try {
+      await api.delete('/accounts/profile/');
+      localStorage.removeItem('access');
+      localStorage.removeItem('refresh');
+      window.location.href = '/';
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Unable to delete your account.');
+      setDeleting(false);
+    }
+  };
+
   const image = preview || profile?.profile_picture;
 
   return <AppShell role={role}>
@@ -112,6 +127,15 @@ function Profile() {
         </form>
       </section>
     </div>
+    {role === 'CLASS_REP' && (
+      <section className="panel" style={{ marginTop: '24px', borderColor: '#fecaca' }}>
+        <div className="panel-head"><div><span className="eyebrow" style={{ color: '#b91c1c' }}>Danger zone</span><h2>Delete account</h2></div></div>
+        <p className="muted-copy">Permanently remove your representative account and profile data.</p>
+        <button className="button" style={{ color: '#b91c1c', border: '1px solid #fca5a5', background: '#fff1f2' }} onClick={deleteAccount} disabled={deleting}>
+          {deleting ? 'Deleting…' : 'Delete my account'}
+        </button>
+      </section>
+    )}
   </AppShell>;
 }
 

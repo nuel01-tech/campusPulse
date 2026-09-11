@@ -14,6 +14,11 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config
 
+
+def parse_debug(value):
+    """Treat deployment labels such as ``release`` as production mode."""
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -29,7 +34,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=parse_debug)
 
 ALLOWED_HOSTS = ['*']
 
