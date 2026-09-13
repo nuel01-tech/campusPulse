@@ -69,8 +69,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return value
 
 
-class ClassmateSerializer(serializers.ModelSerializer):
-    """Public-safe profile data shown on the classmates directory."""
+class StudentClassmateSerializer(serializers.ModelSerializer):
+    """Minimal, privacy-safe details for students viewing classmates."""
+    role_label = serializers.CharField(source='get_role_display', read_only=True)
+    level_label = serializers.CharField(source='get_level_display', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'first_name', 'last_name',
+            'profile_picture', 'role', 'role_label',
+            'level', 'level_label',
+        ]
+        read_only_fields = fields
+
+
+class RepClassmateSerializer(serializers.ModelSerializer):
+    """Full student details accessible exclusively by Course Representatives."""
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     role_label = serializers.CharField(source='get_role_display', read_only=True)
     level_label = serializers.CharField(source='get_level_display', read_only=True)
@@ -80,7 +95,7 @@ class ClassmateSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'first_name', 'last_name', 'email', 'phone_number', 'matric_number',
             'profile_picture', 'role', 'role_label',
-            'department_name', 'level', 'level_label',
+            'department_name', 'level', 'level_label', 'is_active', 'date_joined',
         ]
         read_only_fields = fields
 

@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
-    ChangePasswordView, ClassmatesView, DepartmentListView, ForgotPasswordView, MyProfileView,
-    PreferencesView, ResetPasswordView, SaveSubscriptionView, SignupView, UpdateMatricView,
+    ChangePasswordView, ClassmatesView, DeleteStudentAccountView, DepartmentListView,
+    ForgotPasswordView, MyProfileView, PreferencesView, ResetPasswordView,
+    SaveSubscriptionView, SignupView, ToggleSuspendStudentView, UpdateMatricView,
 )
 
 urlpatterns = [
@@ -15,4 +16,6 @@ urlpatterns = [
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('save-subscription/', SaveSubscriptionView.as_view(), name='save-subscription'),
     path('classmates/', ClassmatesView.as_view(), name='classmates'),
+    path('classmates/<int:pk>/toggle-suspend/', ToggleSuspendStudentView.as_view(), name='toggle-suspend-student'),
+    path('classmates/<int:pk>/delete-account/', DeleteStudentAccountView.as_view(), name='delete-student-account'),
 ]

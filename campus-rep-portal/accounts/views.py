@@ -19,7 +19,7 @@ from .models import Department, PushSubscription, User
 from .push import send_push_to_user
 from .serializers import (
     MyTokenObtainPairSerializer, PreferencesSerializer, SignupSerializer,
-    UserProfileSerializer, ClassmateSerializer,
+    UserProfileSerializer, StudentClassmateSerializer, RepClassmateSerializer,
 )
 
 
@@ -213,9 +213,14 @@ class SaveSubscriptionView(APIView):
 
 
 class ClassmatesView(generics.ListAPIView):
-    """Return all students in the same department and level as the requesting user."""
+    """Return classmates in the same department and level.
+    Course Reps receive full details; students receive minimal safe profiles."""
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ClassmateSerializer
+
+    def get_serializer_class(self):
+        if self.request.user.role == 'CLASS_REP':
+            return RepClassmateSerializer
+        return StudentClassmateSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -226,10 +231,69 @@ class ClassmatesView(generics.ListAPIView):
         search = self.request.query_params.get('search', '').strip()
         if search:
             from django.db.models import Q
-            qs = qs.filter(
-                Q(first_name__icontains=search) |
-                Q(last_name__icontains=search) |
-                Q(username__icontains=search) |
-                Q(matric_number__icontains=search)
-            )
+            if user.role == 'CLASS_REP':
+                qs = qs.filter(
+                    Q(first_name__icontains=search) |
+                    Q(last_name__icontains=search) |
+                    Q(username__icontains=search) |
+                    Q(matric_number__icontains=search) |
+                    Q(email__icontains=search)
+                )
+            else:
+                qs = qs.filter(
+                    Q(first_name__icontains=search) |
+                    Q(last_name__icontains=search) |
+                    Q(username__icontains=search)
+                )
         return qs
+
+
+class ToggleSuspendStudentView(APIView):
+    """Allows a Course Representative to suspend or unsuspend a student in their department and level."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role != 'CLASS_REP':
+            return Response({'detail': 'Only Course Representatives can manage student account statuses.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            student = User.objects.get(
+                pk=pk,
+                role='STUDENT',
+                department=request.user.department,
+                level=request.user.level
+            )
+        except User.DoesNotExist:
+            return Response({'detail': 'Student not found in your class.'}, status=status.HTTP_404_NOT_FOUND)
+
+        student.is_active = not student.is_active
+        student.save(update_fields=['is_active'])
+        status_text = 'active' if student.is_active else 'suspended'
+        return Response({
+            'detail': f"Account for {student.get_full_name() or student.username} is now {status_text}.",
+            'id': student.pk,
+            'is_active': student.is_active,
+        })
+
+
+class DeleteStudentAccountView(APIView):
+    """Allows a Course Representative to delete a mistakenly created student account in their department and level."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk):
+        if request.user.role != 'CLASS_REP':
+            return Response({'detail': 'Only Course Representatives can delete mistakenly created student accounts.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            student = User.objects.get(
+                pk=pk,
+                role='STUDENT',
+                department=request.user.department,
+                level=request.user.level
+            )
+        except User.DoesNotExist:
+            return Response({'detail': 'Student not found in your class.'}, status=status.HTTP_404_NOT_FOUND)
+
+        student_name = student.get_full_name() or student.username
+        student.delete()
+        return Response({'detail': f"Account '{student_name}' was deleted successfully."})
