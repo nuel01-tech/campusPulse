@@ -26,6 +26,7 @@ from .serializers import (
 class DepartmentListView(generics.ListAPIView):
     queryset = Department.objects.all().order_by('name')
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     class DeptSerializer(serializers.ModelSerializer):
         class Meta:
@@ -100,6 +101,7 @@ class SignupView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = SignupSerializer
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
 
 class ChangePasswordView(APIView):
@@ -126,6 +128,7 @@ class ChangePasswordView(APIView):
 
 class ForgotPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     @transaction.atomic
     def post(self, request):
@@ -168,6 +171,7 @@ class ForgotPasswordView(APIView):
 
 class ResetPasswordView(APIView):
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         from django.utils.http import urlsafe_base64_decode

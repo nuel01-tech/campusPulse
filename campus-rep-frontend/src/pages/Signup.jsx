@@ -21,34 +21,50 @@ const navigate = useNavigate();
 const attemptRef = useRef(0);
 
   const loadDepartments = async (isAutoRetry = false) => {
-    setLoadingDepartments(true);
+    // 1. Instant fallback from session storage if available
+    const cached = sessionStorage.getItem('campuspulse_departments');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setDepartments(parsed);
+          setLoadingDepartments(false);
+        }
+      } catch {}
+    } else {
+      setLoadingDepartments(true);
+    }
+
     if (!isAutoRetry) {
       attemptRef.current = 0;
       setError('');
     }
+
     try {
-      const r = await api.get('/accounts/departments/');
+      // Use cache-busting timestamp to prevent stale browser disk caching
+      const r = await api.get(`/accounts/departments/?_t=${Date.now()}`);
       const data = r.data || [];
       setDepartments(data);
       setRetryMessage('');
-      if (data.length === 0) {
-        setError('No departments found on the server. Please check backend database.');
-      } else {
+      if (data.length > 0) {
+        sessionStorage.setItem('campuspulse_departments', JSON.stringify(data));
         setError('');
+      } else if (!cached) {
+        setError('No departments found on the server. Please check backend database.');
       }
     } catch {
       attemptRef.current += 1;
       if (attemptRef.current < 4) {
-        setRetryMessage(`Server is waking up, retrying… (${attemptRef.current}/3)`);
-        setTimeout(() => loadDepartments(true), 3000);
+        setRetryMessage(`Loading departments… retrying (${attemptRef.current}/3)`);
+        setTimeout(() => loadDepartments(true), 2500);
         return;
       }
       setRetryMessage('');
-      setError('Taking longer than usual to load departments. Tap retry below.');
-    } finally {
-      if (attemptRef.current === 0 || attemptRef.current >= 4) {
-        setLoadingDepartments(false);
+      if (!cached) {
+        setError('Taking longer than usual to load departments. Tap retry below.');
       }
+    } finally {
+      setLoadingDepartments(false);
     }
   };
 
