@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+
 function Signup() {
   const [form, setForm] = useState({
     firstName: '',
@@ -12,13 +13,14 @@ function Signup() {
     level: '',
     classCode: '',
   });
-const [departments, setDepartments] = useState([]);
-const [loadingDepartments, setLoadingDepartments] = useState(true);
-const [retryMessage, setRetryMessage] = useState('');
-const [termsAccepted, setTermsAccepted] = useState(false);
-const [error, setError] = useState('');
-const navigate = useNavigate();
-const attemptRef = useRef(0);
+  const [departments, setDepartments] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
+  const [retryMessage, setRetryMessage] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const attemptRef = useRef(0);
 
   const loadDepartments = async (isAutoRetry = false) => {
     // 1. Instant fallback from session storage if available
@@ -41,7 +43,6 @@ const attemptRef = useRef(0);
     }
 
     try {
-      // Use cache-busting timestamp to prevent stale browser disk caching
       const r = await api.get(`/accounts/departments/?_t=${Date.now()}`);
       const data = r.data || [];
       setDepartments(data);
@@ -50,7 +51,7 @@ const attemptRef = useRef(0);
         sessionStorage.setItem('campuspulse_departments', JSON.stringify(data));
         setError('');
       } else if (!cached) {
-        setError('No departments found on the server. Please check backend database.');
+        setError('No departments found on the server. Please contact your rep.');
       }
     } catch {
       attemptRef.current += 1;
@@ -73,19 +74,21 @@ const attemptRef = useRef(0);
   }, []);
 
   const setField = (k, v) => setForm({ ...form, [k]: v });
+
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
     try {
       await api.post('/accounts/signup/', {
-        username: form.username,
-        first_name: form.firstName,
-        last_name: form.lastName,
-        email: form.email,
+        username: form.username.trim(),
+        first_name: form.firstName.trim(),
+        last_name: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         department: form.department,
         level: form.level,
-        class_code: form.classCode,
+        class_code: form.classCode.trim().toUpperCase(),
         terms_accepted: termsAccepted,
       });
       navigate('/login');
@@ -97,10 +100,14 @@ const attemptRef = useRef(0);
         serverError?.username?.[0] ||
         serverError?.email?.[0] ||
         serverError?.terms_accepted?.[0] ||
-        'Signup failed. Please check your details.';
+        serverError?.detail ||
+        'Signup failed. Please check your details and class code.';
       setError(message);
+    } finally {
+      setSubmitting(false);
     }
   };
+
   return (
     <div className="auth-page signup-page">
       <div className="auth-side">
@@ -108,13 +115,16 @@ const attemptRef = useRef(0);
           <span className="brand-mark">CP</span>
           <span>CampusPulse</span>
         </div>
-        <div>
-          <span className="eyebrow light">Join your campus workspace.</span>
+        <div className="auth-side-content">
+          <span className="eyebrow light">
+            <span className="eyebrow-dot" /> Join your class workspace
+          </span>
           <h1>Built around the way university communities actually work.</h1>
           <p>Create your account and keep attendance, sessions and updates in one place.</p>
         </div>
-        <span className="auth-side-foot">Olabisi Onabanjo University</span>
+        <span className="auth-side-foot">Olabisi Onabanjo University · Student &amp; Rep Portal</span>
       </div>
+
       <div className="auth-main">
         <div className="auth-card wide">
           <div className="auth-mobile-brand">
@@ -123,46 +133,89 @@ const attemptRef = useRef(0);
               <span>CampusPulse</span>
             </div>
           </div>
-          <span className="eyebrow">Get started</span>
-          <h2>Create your account.</h2>
-          <p className="auth-sub">A few details and you're ready to go.</p>
+
+          <div className="auth-header">
+            <span className="eyebrow">
+              <span className="eyebrow-dot" /> Quick registration
+            </span>
+            <h2>Create your account</h2>
+            <p className="auth-sub">Enter your details and class signup code to begin.</p>
+          </div>
+
+          {error && <div className="notice error">{error}</div>}
+
           <form onSubmit={submit} className="form-grid">
             <label>
               First name
-              <input value={form.firstName} onChange={(e) => setField('firstName', e.target.value)} required />
+              <input
+                type="text"
+                value={form.firstName}
+                onChange={(e) => setField('firstName', e.target.value)}
+                placeholder="e.g. John"
+                required
+              />
             </label>
+
             <label>
               Last name
-              <input value={form.lastName} onChange={(e) => setField('lastName', e.target.value)} required />
+              <input
+                type="text"
+                value={form.lastName}
+                onChange={(e) => setField('lastName', e.target.value)}
+                placeholder="e.g. Doe"
+                required
+              />
             </label>
+
             <label>
               Username
-              <input value={form.username} onChange={(e) => setField('username', e.target.value)} required />
+              <input
+                type="text"
+                value={form.username}
+                onChange={(e) => setField('username', e.target.value)}
+                placeholder="e.g. jdoe24"
+                autoComplete="username"
+                required
+              />
             </label>
+
             <label>
-              Email
-              <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} required />
+              Email address
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setField('email', e.target.value)}
+                placeholder="name@example.com"
+                autoComplete="email"
+                required
+              />
             </label>
+
             <label>
-              <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Department</span>
                 {departments.length === 0 && !loadingDepartments && (
                   <button
                     type="button"
                     onClick={() => loadDepartments(false)}
-                    style={{ border: 'none', background: 'none', color: '#1f5eff', fontSize: '11px', cursor: 'pointer', fontWeight: 700 }}
+                    style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', cursor: 'pointer', fontWeight: 700 }}
                   >
-                    ↻ Retry loading
+                    ↻ Reload
                   </button>
                 )}
-              </span>
-              <select value={form.department} onChange={(e) => setField('department', e.target.value)} required disabled={loadingDepartments}>
+              </div>
+              <select
+                value={form.department}
+                onChange={(e) => setField('department', e.target.value)}
+                required
+                disabled={loadingDepartments}
+              >
                 <option value="">
                   {loadingDepartments
                     ? 'Loading departments…'
                     : departments.length === 0
-                    ? 'No departments loaded (tap retry)'
-                    : 'Select department'}
+                    ? 'No departments loaded (tap reload)'
+                    : 'Select your department'}
                 </option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -171,52 +224,80 @@ const attemptRef = useRef(0);
                 ))}
               </select>
             </label>
+
             <label>
               Level
               <select value={form.level} onChange={(e) => setField('level', e.target.value)} required>
-                <option value="">Select level</option>
+                <option value="">Select current level</option>
                 {['100', '200', '300', '400', '500'].map((x) => (
                   <option key={x} value={x}>{x} Level</option>
                 ))}
               </select>
             </label>
+
             <label className="full">
-              Class code
+              Class Signup Code
               <input
+                type="text"
                 value={form.classCode}
-                onChange={(e) => setField('classCode', e.target.value)}
-                placeholder="Enter code from your class rep"
+                onChange={(e) => setField('classCode', e.target.value.toUpperCase())}
+                placeholder="Enter the 6-character code from your class rep"
                 required
               />
-              <small style={{ display: 'block', marginTop: '6px', color: '#64748b', fontSize: '12px' }}>
-                Ask your class rep for the code for your department and level.
-              </small>
+              <span className="field-hint">
+                Ask your Course Representative for the code designated for your department &amp; level.
+              </span>
             </label>
+
             <label className="full">
               Password
-              <input type="password" value={form.password} onChange={(e) => setField('password', e.target.value)} minLength={8} required />
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => setField('password', e.target.value)}
+                placeholder="Minimum 8 characters"
+                minLength={8}
+                required
+              />
             </label>
-            <label className="terms-check full">
-              <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} required />
-              <span>I agree to the <Link to="/terms">Terms & Conditions</Link>.</span>
-            </label>
-           {loadingDepartments && (
-             <div className="field-hint full">
-               {retryMessage || 'Loading the department list…'}
-             </div>
-           )}
-            {error && <div className="form-error full">{error}</div>}
-            <button type="submit" className="button primary full">
-              Create account
-            </button>
-            <div className="auth-switch">
-              <span>Already have an account?</span>
-              <Link to="/login">Log in</Link>
+
+            <div className="terms-check-wrapper full">
+              <label className="terms-check">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  required
+                />
+                <span>
+                  I have read and agree to the{' '}
+                  <Link to="/terms" target="_blank" className="text-link">
+                    Terms &amp; Conditions
+                  </Link>
+                </span>
+              </label>
+            </div>
+
+            {loadingDepartments && (
+              <div className="field-hint full" style={{ color: '#2563eb', fontWeight: 600 }}>
+                {retryMessage || 'Connecting to department database…'}
+              </div>
+            )}
+
+            <div className="full" style={{ marginTop: '8px' }}>
+              <button type="submit" className="button primary large full" disabled={submitting}>
+                {submitting ? 'Creating account…' : 'Complete Registration'}
+              </button>
             </div>
           </form>
+
+          <p className="auth-switch">
+            Already registered? <Link to="/login">Sign in to your workspace</Link>
+          </p>
         </div>
       </div>
     </div>
   );
 }
+
 export default Signup;
