@@ -34,6 +34,7 @@ class User(AbstractUser):
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
     matric_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     level = models.CharField(max_length=3, choices=LEVELS, null=True, blank=True)
+    registration_completed = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
 
 

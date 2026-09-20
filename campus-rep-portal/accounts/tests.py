@@ -8,12 +8,12 @@ from attendance.models import ClassCode
 User = get_user_model()
 
 
-class SignupClassCodeValidationTests(TestCase):
+class SignupRegistrationTests(TestCase):
     def setUp(self):
+        self.client = APIClient()
         self.department = Department.objects.create(name='Computer Science', faculty='Science')
-        ClassCode.objects.create(department=self.department, level='200', code='AB12CD')
 
-    def test_signup_accepts_matching_department_level_code(self):
+    def test_signup_creates_account_without_completion_fields(self):
         data = {
             'username': 'student1',
             'first_name': 'Jane',
@@ -22,31 +22,36 @@ class SignupClassCodeValidationTests(TestCase):
             'password': 'StrongPass123',
             'department': self.department.id,
             'level': '200',
-            'phone_number': '08012345678',
-            'class_code': 'AB12CD',
             'terms_accepted': True,
         }
 
         serializer = SignupSerializer(data=data)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-    def test_signup_rejects_wrong_code_for_department_level(self):
-        data = {
-            'username': 'student2',
-            'first_name': 'John',
-            'last_name': 'Smith',
-            'email': 'student2@example.com',
-            'password': 'StrongPass123',
-            'department': self.department.id,
-            'level': '200',
-            'phone_number': '08012345679',
-            'class_code': 'ZZ99XX',
-            'terms_accepted': True,
-        }
+    def test_student_completion_requires_all_three_details(self):
+        ClassCode.objects.create(department=self.department, level='200', code='AB12CD')
+        student = User.objects.create_user(
+            username='student_incomplete',
+            password='StrongPass123',
+            department=self.department,
+            level='200',
+        )
+        self.client.force_authenticate(user=student)
 
-        serializer = SignupSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('class_code', serializer.errors)
+        incomplete = self.client.patch('/api/accounts/update-matric/', {
+            'matric_number': 'CMP/2022/010',
+            'phone_number': '08012345678',
+        }, format='json')
+        self.assertEqual(incomplete.status_code, 400)
+
+        complete = self.client.patch('/api/accounts/update-matric/', {
+            'matric_number': 'CMP/2022/010',
+            'phone_number': '08012345678',
+            'class_code': 'AB12CD',
+        }, format='json')
+        self.assertEqual(complete.status_code, 200)
+        student.refresh_from_db()
+        self.assertTrue(student.registration_completed)
 
 
 class ClassmatesAndManagementTests(TestCase):

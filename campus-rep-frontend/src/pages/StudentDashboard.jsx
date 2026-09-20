@@ -6,8 +6,155 @@ import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 
 const getGreeting = () => {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+};
+
+const LocationIcon = ({ size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const RefreshIcon = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21 2v6h-6" />
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M3 22v-6h6" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+  </svg>
+);
+
+const ArrowIcon = ({ size = 15 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M5 12h14" />
+    <path d="m13 6 6 6-6 6" />
+  </svg>
+);
+
+const HistoryIcon = ({ size = 19 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v5h5" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
+const AnnouncementIcon = ({ size = 19 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 11v2a2 2 0 0 0 2 2h2l3 4h2l-1.5-4H13l7 3V6l-7 3H5a2 2 0 0 0-2 2Z" />
+  </svg>
+);
+
+const DocumentIcon = ({ size = 19 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="M8 13h8" />
+    <path d="M8 17h5" />
+  </svg>
+);
+
+const CheckIcon = ({ size = 16 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.3"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="m5 12 4 4L19 6" />
+  </svg>
+);
+
+const FlameIcon = ({ size = 17 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 22a7 7 0 0 0 7-7c0-3.2-2.2-5.8-4.8-7.9.2 2.3-.5 3.8-1.8 4.8.1-3.6-1.6-6.4-4.1-8.9.1 3.1-2.3 5.1-2.3 8.3A7 7 0 0 0 12 22Z" />
+  </svg>
+);
+
+const getCategoryLabel = (category) => {
+  if (category === "ASSIGNMENT") return "Assignment";
+  if (category === "VENUE_CHANGE") return "Venue change";
+  return "Department update";
 };
 
 function StudentDashboard() {
@@ -18,25 +165,33 @@ function StudentDashboard() {
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const navigate = useNavigate();
 
   let decoded = {};
+
   try {
     const token = localStorage.getItem("access");
     decoded = token ? jwtDecode(token) : {};
-  } catch {}
+  } catch {
+    decoded = {};
+  }
 
   const loadData = async () => {
     setLoading(true);
+    setError("");
+
     try {
-      const [s, a, st] = await Promise.all([
-        api.get("/attendance/sessions/active/"),
-        api.get("/attendance/announcements/"),
-        api.get("/attendance/my-stats/"),
-      ]);
-      setActiveSessions(s.data || []);
-      setAnnouncements(a.data || []);
-      setStats(st.data || null);
+      const [sessionsResponse, announcementsResponse, statsResponse] =
+        await Promise.all([
+          api.get("/attendance/sessions/active/"),
+          api.get("/attendance/announcements/"),
+          api.get("/attendance/my-stats/"),
+        ]);
+
+      setActiveSessions(sessionsResponse.data || []);
+      setAnnouncements(announcementsResponse.data || []);
+      setStats(statsResponse.data || null);
     } catch {
       setError("Some dashboard data could not be loaded.");
     } finally {
@@ -62,340 +217,545 @@ function StudentDashboard() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const r = await api.post(`/attendance/sessions/${id}/checkin/`, {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-          setMessage(r.data.detail || "Successfully checked in!");
+          const response = await api.post(
+            `/attendance/sessions/${id}/checkin/`,
+            {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            },
+          );
+
+          setMessage(response.data.detail || "Successfully checked in!");
           await loadData();
         } catch (e) {
           setError(
             e.response?.data?.detail ||
-              "Check-in failed. Please make sure you are inside the lecture room."
+              "Check-in failed. Please make sure you are inside the lecture room.",
           );
         } finally {
           setChecking(null);
         }
       },
       (err) => {
-        let msg = "Could not get your location. Please allow location access.";
+        let locationMessage =
+          "Could not get your location. Please allow location access.";
+
         if (err.code === 1) {
-          msg = "Location permission denied. Please allow location in your browser settings.";
+          locationMessage =
+            "Location permission denied. Please allow location in your browser settings.";
         } else if (err.code === 2) {
-          msg = "Position unavailable. Please ensure GPS/Location is turned on.";
+          locationMessage =
+            "Position unavailable. Please ensure GPS/Location is turned on.";
         }
-        setError(msg);
+
+        setError(locationMessage);
         setChecking(null);
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 0,
+      },
     );
   };
 
-  const shareToWhatsApp = (a) => {
-    const text = `📢 *${a.title}*\n\n${a.body}\n${a.due_date ? `\n⏳ *Due Date:* ${new Date(a.due_date).toLocaleDateString()}` : ''}\n\n— Shared via CampusPulse`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  const shareToWhatsApp = (announcement) => {
+    const text = `📢 *${announcement.title}*\n\n${announcement.body}${
+      announcement.due_date
+        ? `\n⏳ *Due Date:* ${new Date(
+            announcement.due_date,
+          ).toLocaleDateString()}`
+        : ""
+    }\n\n— Shared via CampusPulse`;
+
+    window.open(
+      `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
+      "_blank",
+    );
   };
 
   const rate = stats?.rate ?? 0;
-  const isEligible = rate >= (stats?.eligibility_threshold ?? 70);
+  const threshold = stats?.eligibility_threshold ?? 70;
+  const isEligible = rate >= threshold;
+
+  const primarySession = activeSessions[0];
 
   return (
     <AppShell role="STUDENT">
-      <div className="dashboard-head">
-        <div>
-          <span className="eyebrow">
-            {getGreeting()}, {decoded.username || "Student"}
-          </span>
-          <h1>Your campus at a glance.</h1>
-          <p>Stay up to date with live attendance, announcements and lecture progress.</p>
-        </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <button className="btn-refresh" onClick={loadData} disabled={loading}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
-              <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-              <path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-            </svg>
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-          <button
-            className="button secondary"
-            onClick={() => navigate("/profile")}
-          >
-            Profile
-          </button>
-        </div>
-      </div>
-
-      {(message || error) && (
-        <div className={`notice ${message ? "success" : "error"}`}>
-          {message || error}
-        </div>
-      )}
-
-      {/* Live Class Hero Beacon if any active session exists */}
-      {activeSessions.length > 0 && (
-        <div className="live-session-hero">
-          <div className="live-hero-header">
-            <span className="live-badge-glow">
-              <span className="radar-dot" /> Live Class in Progress
-            </span>
-            <span style={{ fontSize: "11px", opacity: 0.9 }}>
-              {activeSessions.length} active now
-            </span>
-          </div>
-          <h2 className="live-hero-title">
-            {activeSessions[0].course_code}
-          </h2>
-          <div className="live-hero-subtitle">
-            <span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
-              {activeSessions[0].venue_name}
-            </span>
-            <span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
-              {activeSessions[0].level} Level
-            </span>
-            <span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>
-              Radius: {activeSessions[0].radius_meters || 50}m
-            </span>
-          </div>
-          <button
-            className="live-checkin-btn"
-            disabled={checking === activeSessions[0].id}
-            onClick={() => handleCheckIn(activeSessions[0].id)}
-          >
-            {checking === activeSessions[0].id ? "Verifying GPS Location…" : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '5px' }}><polyline points="20 6 9 17 4 12" /></svg>
-                Tap to Check In with GPS
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Quick Action Cards Grid for Mobile Ergonomics */}
-      <div className="quick-action-grid">
-        <div className="action-tile" onClick={() => navigate("/student/attendance")}>
-          <div className="action-tile-icon" style={{ background: "#ecfdf5", color: "#059669" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
-          </div>
+      <div className="cp-student-dashboard">
+        {/* Header */}
+        <header className="cp-student-header">
           <div>
-            <strong>Live Check-in</strong>
-            <span>{activeSessions.length} session{activeSessions.length === 1 ? "" : "s"} live</span>
-          </div>
-        </div>
+            <span className="cp-student-eyebrow">
+              {getGreeting()}, {decoded.username || "Student"}
+            </span>
 
-        <div className="action-tile" onClick={() => navigate("/student/history")}>
-          <div className="action-tile-icon" style={{ background: "#eff6ff", color: "#2563eb" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /><line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="15" y2="16" /></svg>
-          </div>
-          <div>
-            <strong>Class History</strong>
-            <span>{stats ? `${stats.attended} attended` : "View history"}</span>
-          </div>
-        </div>
+            <h1>Welcome back.</h1>
 
-        <div className="action-tile" onClick={() => navigate("/student/announcements")}>
-          <div className="action-tile-icon" style={{ background: "#fef3c7", color: "#d97706" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+            <p>
+              Keep track of your attendance, class updates and course resources
+              from one place.
+            </p>
           </div>
-          <div>
-            <strong>Announcements</strong>
-            <span>{announcements.length} update{announcements.length === 1 ? "" : "s"}</span>
-          </div>
-        </div>
 
-        <div className="action-tile" onClick={() => navigate("/documents")}>
-          <div className="action-tile-icon" style={{ background: "#f3e8ff", color: "#7c3aed" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
-          </div>
-          <div>
-            <strong>Course Docs</strong>
-            <span>Lecture notes & PDFs</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Summary Grid */}
-      <div className="stat-grid">
-        <div className={`stat-card ${isEligible ? "accent" : ""}`}>
-          <span>Attendance rate</span>
-          <strong>{rate}%</strong>
-          <div className="progress">
-            <i style={{ width: `${Math.min(rate, 100)}%` }} />
-          </div>
-          <small>
-            {stats
-              ? `${stats.attended} of ${stats.total_sessions} classes attended`
-              : "Loading your attendance"}
-          </small>
-        </div>
-        <div className="stat-card">
-          <span>Current streak</span>
-          <strong>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px', color: '#f97316' }}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
-            {stats?.streak ?? 0}
-          </strong>
-          <small>consecutive classes present</small>
-          <div className="stat-mark">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></svg>
-          </div>
-        </div>
-        <div className="stat-card">
-          <span>Active classes</span>
-          <strong>{activeSessions.length}</strong>
-          <small>available right now</small>
-          <div className="live-pill">
-            <i /> Live
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content: Sessions & Announcements */}
-      <div className="content-grid">
-        <section className="panel main-panel">
-          <div className="panel-head">
-            <div>
-              <span className="eyebrow">Classes</span>
-              <h2>Available sessions</h2>
-            </div>
+          <div className="cp-student-header-actions">
             <button
-              className="text-button"
-              onClick={() => navigate("/student/attendance")}
+              className="cp-student-refresh"
+              onClick={loadData}
+              disabled={loading}
+              type="button"
             >
-              View all →
+              <RefreshIcon />
+              {loading ? "Refreshing…" : "Refresh"}
+            </button>
+
+            <button
+              className="cp-student-profile-button"
+              onClick={() => navigate("/profile")}
+              type="button"
+            >
+              Profile
             </button>
           </div>
-          {loading ? (
-            <LoadingSkeleton rows={3} />
-          ) : activeSessions.length === 0 ? (
-            <div className="empty-state">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /></svg>
-              <h3>No classes live right now</h3>
-              <p>When your class representative starts attendance, it will appear here instantly.</p>
+        </header>
+
+        {/* Feedback */}
+        {(message || error) && (
+          <div
+            className={`cp-student-feedback ${message ? "success" : "error"}`}
+            role="status"
+          >
+            <span className="cp-student-feedback-icon">
+              {message ? <CheckIcon /> : "!"}
+            </span>
+
+            <span>{message || error}</span>
+          </div>
+        )}
+
+        {/* Live attendance */}
+        {primarySession && (
+          <section className="cp-student-live">
+            <div className="cp-student-live-main">
+              <div className="cp-student-live-topline">
+                <span className="cp-student-live-status">
+                  <span className="cp-student-live-dot" />
+                  Live attendance
+                </span>
+
+                {activeSessions.length > 1 && (
+                  <span className="cp-student-live-count">
+                    {activeSessions.length} sessions active
+                  </span>
+                )}
+              </div>
+
+              <div className="cp-student-live-content">
+                <div>
+                  <span className="cp-student-live-label">
+                    Class currently taking attendance
+                  </span>
+
+                  <h2>{primarySession.course_code}</h2>
+
+                  <div className="cp-student-live-meta">
+                    <span>
+                      <LocationIcon size={14} />
+                      {primarySession.venue_name}
+                    </span>
+
+                    <span>{primarySession.level} Level</span>
+
+                    <span>{primarySession.radius_meters || 50}m radius</span>
+                  </div>
+                </div>
+
+                <button
+                  className="cp-student-checkin"
+                  disabled={checking === primarySession.id}
+                  onClick={() => handleCheckIn(primarySession.id)}
+                  type="button"
+                >
+                  {checking === primarySession.id ? (
+                    <>
+                      <span className="cp-student-button-spinner" />
+                      Verifying location…
+                    </>
+                  ) : (
+                    <>
+                      <LocationIcon size={16} />
+                      Check in with GPS
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="cp-student-live-note">
+              <LocationIcon size={15} />
+              <span>
+                You must be within the lecture venue radius to be marked
+                present.
+              </span>
+            </div>
+          </section>
+        )}
+
+        {/* Attendance summary */}
+        <section className="cp-student-summary">
+          <div className="cp-student-section-heading">
+            <div>
+              <span className="cp-student-section-kicker">Your attendance</span>
+              <h2>Current progress</h2>
+            </div>
+
+            <button
+              className="cp-student-text-link"
+              onClick={() => navigate("/student/history")}
+              type="button"
+            >
+              View history
+              <ArrowIcon size={14} />
+            </button>
+          </div>
+
+          <div className="cp-student-stat-grid">
+            <article className="cp-student-stat-card cp-student-stat-primary">
+              <div className="cp-student-stat-top">
+                <span>Attendance rate</span>
+
+                <span
+                  className={`cp-student-stat-status ${
+                    isEligible ? "eligible" : "attention"
+                  }`}
+                >
+                  {isEligible ? "On track" : "Needs attention"}
+                </span>
+              </div>
+
+              <strong>{rate}%</strong>
+
+              <div className="cp-student-progress">
+                <span
+                  style={{
+                    width: `${Math.min(Math.max(rate, 0), 100)}%`,
+                  }}
+                />
+              </div>
+
+              <small>
+                {stats
+                  ? `${stats.attended} of ${stats.total_sessions} classes attended`
+                  : "Attendance data loading"}
+              </small>
+            </article>
+
+            <article className="cp-student-stat-card">
+              <div className="cp-student-stat-icon">
+                <FlameIcon />
+              </div>
+
+              <span>Current streak</span>
+
+              <strong>{stats?.streak ?? 0}</strong>
+
+              <small>consecutive classes present</small>
+            </article>
+
+            <article className="cp-student-stat-card">
+              <div className="cp-student-stat-icon live">
+                <span />
+              </div>
+
+              <span>Live now</span>
+
+              <strong>{activeSessions.length}</strong>
+
+              <small>
+                {activeSessions.length === 1
+                  ? "class available"
+                  : "classes available"}
+              </small>
+            </article>
+          </div>
+        </section>
+
+        {/* Quick navigation */}
+        <section className="cp-student-quick">
+          <div className="cp-student-section-heading">
+            <div>
+              <span className="cp-student-section-kicker">Workspace</span>
+              <h2>Quick access</h2>
+            </div>
+          </div>
+
+          <div className="cp-student-quick-grid">
+            <button
+              className="cp-student-quick-item"
+              onClick={() => navigate("/student/attendance")}
+              type="button"
+            >
+              <span className="cp-student-quick-icon attendance">
+                <LocationIcon size={19} />
+              </span>
+
+              <span className="cp-student-quick-copy">
+                <strong>Attendance</strong>
+                <small>Check in to live classes</small>
+              </span>
+
+              <ArrowIcon />
+            </button>
+
+            <button
+              className="cp-student-quick-item"
+              onClick={() => navigate("/student/history")}
+              type="button"
+            >
+              <span className="cp-student-quick-icon history">
+                <HistoryIcon />
+              </span>
+
+              <span className="cp-student-quick-copy">
+                <strong>Attendance history</strong>
+                <small>Review previous classes</small>
+              </span>
+
+              <ArrowIcon />
+            </button>
+
+            <button
+              className="cp-student-quick-item"
+              onClick={() => navigate("/student/announcements")}
+              type="button"
+            >
+              <span className="cp-student-quick-icon announcements">
+                <AnnouncementIcon />
+              </span>
+
+              <span className="cp-student-quick-copy">
+                <strong>Announcements</strong>
+                <small>
+                  {announcements.length}{" "}
+                  {announcements.length === 1 ? "update" : "updates"}
+                </small>
+              </span>
+
+              <ArrowIcon />
+            </button>
+
+            <button
+              className="cp-student-quick-item"
+              onClick={() => navigate("/documents")}
+              type="button"
+            >
+              <span className="cp-student-quick-icon documents">
+                <DocumentIcon />
+              </span>
+
+              <span className="cp-student-quick-copy">
+                <strong>Course documents</strong>
+                <small>Lecture notes and PDFs</small>
+              </span>
+
+              <ArrowIcon />
+            </button>
+          </div>
+        </section>
+
+        {/* Main content */}
+        <div className="cp-student-content-grid">
+          {/* Live sessions */}
+          <section className="cp-student-panel">
+            <div className="cp-student-panel-header">
+              <div>
+                <span className="cp-student-section-kicker">Attendance</span>
+                <h2>Live sessions</h2>
+              </div>
+
               <button
-                className="btn-refresh"
-                onClick={loadData}
-                style={{ marginTop: "12px" }}
+                className="cp-student-text-link"
+                onClick={() => navigate("/student/attendance")}
+                type="button"
               >
-                Check again
+                Open attendance
+                <ArrowIcon size={14} />
               </button>
             </div>
-          ) : (
-            <div className="session-list">
-              {activeSessions.map((s) => (
-                <div className="session-row" key={s.id}>
-                  <div className="session-icon">
-                    {s.course_code?.slice(0, 2)}
-                  </div>
-                  <div className="session-info">
-                    <strong>{s.course_code}</strong>
-                    <span>
-                      {s.venue_name} · {s.level} Level · {s.radius_meters || 50}m
-                    </span>
-                  </div>
-                  <div className="session-status">
-                    <i /> Live
-                  </div>
-                  <button
-                    className="button primary small"
-                    disabled={checking === s.id}
-                    onClick={() => handleCheckIn(s.id)}
-                  >
-                    {checking === s.id ? "Checking…" : "Check in"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
 
-        <section className="panel">
-          <div className="panel-head">
-            <div>
-              <span className="eyebrow">Notice board</span>
-              <h2>Announcements</h2>
-            </div>
-            <button
-              className="text-button"
-              onClick={() => navigate("/student/announcements")}
-            >
-              See all →
-            </button>
-          </div>
-          {announcements.length === 0 ? (
-            <div className="empty-state compact">
-              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><circle cx="12" cy="12" r="10" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
-              <p>No new announcements yet.</p>
-            </div>
-          ) : (
-            <div className="announcement-list">
-              {announcements.slice(0, 4).map((a) => (
-                <article key={a.id}>
-                  <div className="announcement-meta">
-                    <span>
-                      {a.category === "ASSIGNMENT" ? (
-                        <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>Assignment</>
-                      ) : a.category === "VENUE_CHANGE" ? (
-                        <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>Venue Change</>
-                      ) : (
-                        <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>Department update</>
-                      )}
+            {loading ? (
+              <LoadingSkeleton rows={3} />
+            ) : activeSessions.length === 0 ? (
+              <div className="cp-student-empty">
+                <div className="cp-student-empty-icon">
+                  <LocationIcon size={21} />
+                </div>
+
+                <strong>No classes are live right now</strong>
+
+                <p>
+                  Active attendance sessions will appear here when your class
+                  representative starts one.
+                </p>
+
+                <button
+                  className="cp-student-secondary-button"
+                  onClick={loadData}
+                  type="button"
+                >
+                  <RefreshIcon size={13} />
+                  Check again
+                </button>
+              </div>
+            ) : (
+              <div className="cp-student-session-list">
+                {activeSessions.map((session) => (
+                  <div className="cp-student-session" key={session.id}>
+                    <div className="cp-student-course-mark">
+                      {session.course_code?.slice(0, 2) || "CP"}
+                    </div>
+
+                    <div className="cp-student-session-info">
+                      <strong>{session.course_code}</strong>
+
+                      <span>
+                        {session.venue_name} · {session.level} Level ·{" "}
+                        {session.radius_meters || 50}m
+                      </span>
+                    </div>
+
+                    <span className="cp-student-session-live">
+                      <i />
+                      Live
                     </span>
-                    <time>{new Date(a.created_at).toLocaleDateString()}</time>
-                  </div>
-                  <h3>{a.title}</h3>
-                  <p>{a.body}</p>
-                  {a.due_date && (
-                    <p style={{ fontSize: "11px", color: "#d97706", fontWeight: 700, margin: "6px 0" }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                      Due: {new Date(a.due_date).toLocaleDateString()}
-                    </p>
-                  )}
-                  <div style={{ marginTop: "8px" }}>
+
                     <button
-                      className="share-btn-whatsapp"
-                      onClick={() => shareToWhatsApp(a)}
+                      className="cp-student-session-button"
+                      disabled={checking === session.id}
+                      onClick={() => handleCheckIn(session.id)}
+                      type="button"
                     >
-                      <span>Share on WhatsApp</span>
+                      {checking === session.id ? "Checking…" : "Check in"}
                     </button>
                   </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+                ))}
+              </div>
+            )}
+          </section>
 
-      {/* Exam Eligibility Strip */}
-      <section className="eligibility-strip">
-        <div>
-          <span className={`status-dot ${isEligible ? "green" : "amber"}`} />
-          <div>
+          {/* Announcements */}
+          <section className="cp-student-panel">
+            <div className="cp-student-panel-header">
+              <div>
+                <span className="cp-student-section-kicker">Notice board</span>
+                <h2>Latest updates</h2>
+              </div>
+
+              <button
+                className="cp-student-text-link"
+                onClick={() => navigate("/student/announcements")}
+                type="button"
+              >
+                See all
+                <ArrowIcon size={14} />
+              </button>
+            </div>
+
+            {loading ? (
+              <LoadingSkeleton rows={3} />
+            ) : announcements.length === 0 ? (
+              <div className="cp-student-empty compact">
+                <div className="cp-student-empty-icon">
+                  <AnnouncementIcon size={20} />
+                </div>
+
+                <strong>No announcements yet</strong>
+
+                <p>Updates from your class representative will appear here.</p>
+              </div>
+            ) : (
+              <div className="cp-student-announcement-list">
+                {announcements.slice(0, 4).map((announcement) => (
+                  <article
+                    className="cp-student-announcement"
+                    key={announcement.id}
+                  >
+                    <div className="cp-student-announcement-top">
+                      <span
+                        className={`cp-student-category ${(
+                          announcement.category || "GENERAL"
+                        ).toLowerCase()}`}
+                      >
+                        {getCategoryLabel(announcement.category)}
+                      </span>
+
+                      <time>
+                        {new Date(announcement.created_at).toLocaleDateString()}
+                      </time>
+                    </div>
+
+                    <h3>{announcement.title}</h3>
+
+                    <p>{announcement.body}</p>
+
+                    {announcement.due_date && (
+                      <div className="cp-student-due-date">
+                        <span>Due</span>
+                        {new Date(announcement.due_date).toLocaleDateString()}
+                      </div>
+                    )}
+
+                    <button
+                      className="cp-student-share"
+                      onClick={() => shareToWhatsApp(announcement)}
+                      type="button"
+                    >
+                      Share on WhatsApp
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Eligibility */}
+        <section
+          className={`cp-student-eligibility ${
+            isEligible ? "eligible" : "attention"
+          }`}
+        >
+          <div className="cp-student-eligibility-indicator">
+            <span />
+          </div>
+
+          <div className="cp-student-eligibility-copy">
+            <span>Examination attendance status</span>
+
             <strong>
               {isEligible
-                ? "You are in good standing for exams"
-                : "Attendance needs attention (< 70%)"}
+                ? "Your attendance is currently on track."
+                : "Your attendance needs attention."}
             </strong>
-            <span>
-              {stats
-                ? `The OOU examination attendance threshold is ${stats.eligibility_threshold || 70}%.`
-                : "Attendance requirement"}
-            </span>
+
+            <p>
+              Current rate: <b>{rate}%</b>. Examination threshold:{" "}
+              <b>{threshold}%</b>.
+            </p>
           </div>
-        </div>
-        <button
-          className="text-button"
-          onClick={() => navigate("/student/history")}
-        >
-          Review full history →
-        </button>
-      </section>
+
+          <button
+            className="cp-student-eligibility-action"
+            onClick={() => navigate("/student/history")}
+            type="button"
+          >
+            Review history
+            <ArrowIcon size={14} />
+          </button>
+        </section>
+      </div>
     </AppShell>
   );
 }
 
 export default StudentDashboard;
-

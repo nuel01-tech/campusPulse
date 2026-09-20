@@ -2,41 +2,31 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from attendance.models import ClassCode
 from .models import User
 
 
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
-    class_code = serializers.CharField(write_only=True, required=True, trim_whitespace=True)
     terms_accepted = serializers.BooleanField(write_only=True, required=True)
 
     class Meta:
         model = User
         fields = [
             'username', 'first_name', 'last_name', 'email', 'password',
-            'department', 'level', 'phone_number', 'class_code', 'terms_accepted'
+            'department', 'level', 'terms_accepted'
         ]
 
     def validate(self, attrs):
         department = attrs.get('department')
         level = attrs.get('level')
-        class_code = (attrs.get('class_code') or '').strip().upper()
-
         if not department or not level:
             raise serializers.ValidationError({'department': 'Department and level are required.'})
         if not attrs.get('terms_accepted'):
             raise serializers.ValidationError({'terms_accepted': 'You must accept the Terms & Conditions.'})
 
-        expected_code = ClassCode.objects.filter(department=department, level=level).first()
-        if not expected_code or expected_code.code.upper() != class_code:
-            raise serializers.ValidationError({'class_code': 'Invalid class code for the selected department and level.'})
-
-        attrs['class_code'] = class_code
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop('class_code', None)
         validated_data.pop('terms_accepted', None)
         validated_data['terms_accepted_at'] = timezone.now()
         return User.objects.create_user(**validated_data)
@@ -53,7 +43,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'first_name', 'last_name', 'email', 'phone_number',
             'role', 'role_label', 'department', 'department_name', 'faculty',
-            'level', 'level_label', 'matric_number', 'profile_picture', 'terms_accepted_at'
+            'level', 'level_label', 'matric_number', 'profile_picture', 'terms_accepted_at',
+            'registration_completed'
         ]
         read_only_fields = [
             'id', 'username', 'email', 'role', 'role_label', 'department',

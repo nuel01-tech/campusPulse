@@ -34,9 +34,9 @@ class CheckInView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        if not request.user.matric_number:
+        if request.user.role == 'STUDENT' and not request.user.registration_completed:
             return Response(
-                {"detail": "Please add your matric number before checking in."},
+                {"detail": "Complete registration with your matric number, WhatsApp number, and class representative code before checking in."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
