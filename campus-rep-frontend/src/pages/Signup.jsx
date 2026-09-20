@@ -286,7 +286,7 @@ function Signup() {
           </div>
 
           {error && (
-            <div className="cp-auth-feedback error" role="alert">
+            <div className="cp-auth-feedback cp-auth-feedback-error" role="alert">
               <span className="cp-auth-feedback-icon">!</span>
 
               <div>

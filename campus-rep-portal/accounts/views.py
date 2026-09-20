@@ -1,5 +1,3 @@
-from logging import config
-
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password
