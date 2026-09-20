@@ -1,21 +1,111 @@
-import { useEffect, useState, useMemo } from 'react';
-import api from '../api/axios';
-import AppShell from '../components/AppShell';
-import LoadingSkeleton from '../components/LoadingSkeleton';
+import { useEffect, useMemo, useState } from "react";
+import api from "../api/axios";
+import AppShell from "../components/AppShell";
+import LoadingSkeleton from "../components/LoadingSkeleton";
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21 2v6h-6" />
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M3 22v-6h6" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
+function AssignmentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function AnnouncementIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 11v2a2 2 0 0 0 2 2h2l3 5h2l-1.7-5H12l8 4V5l-8 4H5a2 2 0 0 0-2 2Z" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.5 3.5A11.8 11.8 0 0 0 12.1 0C5.6 0 .3 5.3.3 11.8c0 2.1.6 4.1 1.6 5.9L.2 24l6.5-1.7a11.8 11.8 0 0 0 5.4 1.3h.1c6.5 0 11.8-5.3 11.8-11.8 0-3.1-1.2-6.1-3.5-8.3Z" />
+      <path d="M8.7 7.2c.2-.4.4-.4.7-.4h.6c.2 0 .5.1.6.5l.9 2.1c.1.3.1.5-.1.7l-.6.8c-.2.2-.2.4 0 .7.3.5 1 1.6 2.2 2.5 1.1.8 2 .9 2.4 1 .3.1.5 0 .7-.2l.8-1c.2-.2.4-.3.7-.2l2.1 1c.3.1.4.3.4.6 0 .3-.1 1.2-.6 1.6-.5.5-1.2.7-2 .7-.7 0-1.6-.2-2.8-.7-1.1-.5-2.4-1.2-3.7-2.4-1.1-1-1.9-2.2-2.4-3-.5-.8-.8-1.7-.8-2.3 0-.8.3-1.5.7-2Z" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function getCategoryDetails(category) {
+  switch (category) {
+    case "ASSIGNMENT":
+      return {
+        label: "Assignment",
+        icon: AssignmentIcon,
+        className: "assignment",
+      };
+
+    case "VENUE_CHANGE":
+      return {
+        label: "Venue change",
+        icon: LocationIcon,
+        className: "venue",
+      };
+
+    default:
+      return {
+        label: "Department update",
+        icon: AnnouncementIcon,
+        className: "general",
+      };
+  }
+}
 
 function StudentAnnouncements() {
   const [items, setItems] = useState([]);
-  const [category, setCategory] = useState('ALL');
-  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState("ALL");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   const loadAnnouncements = async () => {
     setLoading(true);
+
     try {
-      const r = await api.get('/attendance/announcements/');
-      setItems(r.data || []);
+      const response = await api.get("/attendance/announcements/");
+      setItems(response.data || []);
     } catch {
-      // ignore
+      // Keep the existing behavior: silently handle request failure.
     } finally {
       setLoading(false);
     }
@@ -26,136 +116,288 @@ function StudentAnnouncements() {
   }, []);
 
   const filteredItems = useMemo(() => {
-    return items.filter((a) => {
-      const matchCat = category === 'ALL' || a.category === category;
-      const matchSearch =
-        !search ||
-        a.title?.toLowerCase().includes(search.toLowerCase()) ||
-        a.body?.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return items.filter((announcement) => {
+      const matchesCategory =
+        category === "ALL" || announcement.category === category;
+
+      const matchesSearch =
+        !normalizedSearch ||
+        announcement.title?.toLowerCase().includes(normalizedSearch) ||
+        announcement.body?.toLowerCase().includes(normalizedSearch);
+
+      return matchesCategory && matchesSearch;
     });
   }, [items, category, search]);
 
-  const shareToWhatsApp = (a) => {
-    const text = `📢 *${a.title}*\n\n${a.body}\n${a.due_date ? `\n⏳ *Due Date:* ${new Date(a.due_date).toLocaleDateString()}` : ''}\n\n— Shared via CampusPulse`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  const counts = useMemo(
+    () => ({
+      ALL: items.length,
+      ASSIGNMENT: items.filter((item) => item.category === "ASSIGNMENT").length,
+      VENUE_CHANGE: items.filter((item) => item.category === "VENUE_CHANGE")
+        .length,
+      GENERAL: items.filter((item) => item.category === "GENERAL").length,
+    }),
+    [items],
+  );
+
+  const shareToWhatsApp = (announcement) => {
+    const text =
+      `📢 *${announcement.title}*\n\n` +
+      `${announcement.body}` +
+      `${
+        announcement.due_date
+          ? `\n\n⏳ *Due Date:* ${new Date(
+              announcement.due_date,
+            ).toLocaleDateString()}`
+          : ""
+      }` +
+      `\n\n— Shared via CampusPulse`;
+
+    window.open(
+      `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`,
+      "_blank",
+    );
   };
 
   return (
     <AppShell role="STUDENT">
-      <div className="dashboard-head">
-        <div>
-          <span className="eyebrow">Department updates</span>
-          <h1>Announcements.</h1>
-          <p>Important updates, assignments and venue changes from your class representative.</p>
-        </div>
-        <button className="btn-refresh" onClick={loadAnnouncements} disabled={loading}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
-            <path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-            <path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-          </svg>
-          {loading ? 'Loading…' : 'Refresh'}
-        </button>
-      </div>
+      <div className="cp-student-announcements">
+        <header className="cp-announcements-header">
+          <div>
+            <span className="cp-page-eyebrow">
+              <span />
+              Department updates
+            </span>
 
-      <div style={{ marginBottom: '16px' }}>
-        <input
-          type="text"
-          placeholder="Search announcements..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            width: '100%',
-            maxWidth: '360px',
-            padding: '9px 14px',
-            borderRadius: '10px',
-            border: '1px solid #dfe4eb',
-            fontSize: '13px',
-            background: '#ffffff',
-          }}
-        />
-      </div>
+            <h1>Announcements</h1>
 
-      {/* Filter Tabs */}
-      <div className="filter-tabs">
-        <button
-          className={`filter-tab ${category === 'ALL' ? 'active' : ''}`}
-          onClick={() => setCategory('ALL')}
-        >
-          All Updates ({items.length})
-        </button>
-        <button
-          className={`filter-tab ${category === 'ASSIGNMENT' ? 'active' : ''}`}
-          onClick={() => setCategory('ASSIGNMENT')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-          Assignments ({items.filter((i) => i.category === 'ASSIGNMENT').length})
-        </button>
-        <button
-          className={`filter-tab ${category === 'VENUE_CHANGE' ? 'active' : ''}`}
-          onClick={() => setCategory('VENUE_CHANGE')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>
-          Venue Changes ({items.filter((i) => i.category === 'VENUE_CHANGE').length})
-        </button>
-        <button
-          className={`filter-tab ${category === 'GENERAL' ? 'active' : ''}`}
-          onClick={() => setCategory('GENERAL')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '4px' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
-          General ({items.filter((i) => i.category === 'GENERAL').length})
-        </button>
-      </div>
-
-      <div className="announcement-page-list">
-        {loading ? (
-          <section className="panel"><LoadingSkeleton rows={4} /></section>
-        ) : filteredItems.length === 0 ? (
-          <section className="panel empty-state">
-            <span>—</span>
-            <h3>No announcements found</h3>
             <p>
-              {search
-                ? 'No announcements match your search.'
-                : 'Your class rep has not posted any updates in this category.'}
+              Important updates, assignments and venue changes from your class
+              representative.
             </p>
-          </section>
-        ) : (
-          filteredItems.map((a) => (
-            <article className="panel announcement-detail" key={a.id} style={{ position: 'relative' }}>
-              <div className="announcement-meta">
-                <span>
-                  {a.category === 'ASSIGNMENT' ? (
-                    <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>Assignment</>
-                  ) : a.category === 'VENUE_CHANGE' ? (
-                    <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" /></svg>Venue Change</>
-                  ) : (
-                    <><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '3px' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.57 3.41 2 2 0 0 1 3.55 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 5.6 5.59l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>Department Update</>
-                  )}
-                </span>
-                <time>{new Date(a.created_at).toLocaleDateString()}</time>
+          </div>
+
+          <button
+            type="button"
+            className="cp-announcements-refresh"
+            onClick={loadAnnouncements}
+            disabled={loading}
+          >
+            <RefreshIcon />
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </header>
+
+        <section className="cp-announcements-summary">
+          <div className="cp-announcements-summary-icon">
+            <AnnouncementIcon />
+          </div>
+
+          <div>
+            <strong>
+              {items.length === 1
+                ? "1 class update"
+                : `${items.length} class updates`}
+            </strong>
+
+            <span>
+              {filteredItems.length !== items.length
+                ? `${filteredItems.length} matching your current filters`
+                : "Latest communication from your class workspace"}
+            </span>
+          </div>
+        </section>
+
+        <div className="cp-announcements-toolbar">
+          <div className="cp-announcements-search">
+            <SearchIcon />
+
+            <input
+              type="search"
+              placeholder="Search announcements..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search announcements"
+            />
+
+            {search && (
+              <button
+                type="button"
+                className="cp-announcements-clear"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          <div
+            className="cp-announcements-filters"
+            role="tablist"
+            aria-label="Announcement categories"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={category === "ALL"}
+              className={`cp-announcement-filter ${
+                category === "ALL" ? "active" : ""
+              }`}
+              onClick={() => setCategory("ALL")}
+            >
+              All
+              <span>{counts.ALL}</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={category === "ASSIGNMENT"}
+              className={`cp-announcement-filter ${
+                category === "ASSIGNMENT" ? "active" : ""
+              }`}
+              onClick={() => setCategory("ASSIGNMENT")}
+            >
+              <AssignmentIcon />
+              Assignments
+              <span>{counts.ASSIGNMENT}</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={category === "VENUE_CHANGE"}
+              className={`cp-announcement-filter ${
+                category === "VENUE_CHANGE" ? "active" : ""
+              }`}
+              onClick={() => setCategory("VENUE_CHANGE")}
+            >
+              <LocationIcon />
+              Venue changes
+              <span>{counts.VENUE_CHANGE}</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={category === "GENERAL"}
+              className={`cp-announcement-filter ${
+                category === "GENERAL" ? "active" : ""
+              }`}
+              onClick={() => setCategory("GENERAL")}
+            >
+              <AnnouncementIcon />
+              General
+              <span>{counts.GENERAL}</span>
+            </button>
+          </div>
+        </div>
+
+        <main className="cp-announcements-list">
+          {loading ? (
+            <section className="cp-announcements-loading">
+              <LoadingSkeleton rows={4} />
+            </section>
+          ) : filteredItems.length === 0 ? (
+            <section className="cp-announcements-empty">
+              <div className="cp-announcements-empty-icon">
+                <AnnouncementIcon />
               </div>
-              <h2>{a.title}</h2>
-              <p>{a.body}</p>
 
-              {a.due_date && (
-                <div style={{ marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#92400e', padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700 }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  <span>Submission Deadline: {new Date(a.due_date).toLocaleDateString()}</span>
-                </div>
-              )}
+              <span className="cp-page-eyebrow">Nothing to show</span>
 
-              <div style={{ marginTop: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <h2>No announcements found</h2>
+
+              <p>
+                {search
+                  ? "No announcements match your search. Try a different term."
+                  : "Your class representative has not posted any updates in this category yet."}
+              </p>
+
+              {search && (
                 <button
-                  className="share-btn-whatsapp"
-                  onClick={() => shareToWhatsApp(a)}
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="cp-announcements-empty-action"
                 >
-                  <span>Share on WhatsApp</span>
+                  Clear search
                 </button>
-              </div>
-            </article>
-          ))
-        )}
+              )}
+            </section>
+          ) : (
+            filteredItems.map((announcement, index) => {
+              const details = getCategoryDetails(announcement.category);
+
+              const CategoryIcon = details.icon;
+
+              return (
+                <article
+                  className={`cp-announcement-card ${details.className}`}
+                  key={announcement.id}
+                  style={{
+                    "--cp-announcement-index": index,
+                  }}
+                >
+                  <div className="cp-announcement-card-top">
+                    <div className="cp-announcement-category">
+                      <span>
+                        <CategoryIcon />
+                      </span>
+
+                      {details.label}
+                    </div>
+
+                    <time>
+                      {new Date(announcement.created_at).toLocaleDateString()}
+                    </time>
+                  </div>
+
+                  <div className="cp-announcement-card-body">
+                    <h2>{announcement.title}</h2>
+
+                    <p>{announcement.body}</p>
+
+                    {announcement.due_date && (
+                      <div className="cp-announcement-deadline">
+                        <span>
+                          <ClockIcon />
+                        </span>
+
+                        <div>
+                          <small>Submission deadline</small>
+
+                          <strong>
+                            {new Date(
+                              announcement.due_date,
+                            ).toLocaleDateString()}
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="cp-announcement-card-footer">
+                    <span className="cp-announcement-source">
+                      CampusPulse class update
+                    </span>
+
+                    <button
+                      type="button"
+                      className="cp-announcement-share"
+                      onClick={() => shareToWhatsApp(announcement)}
+                    >
+                      <WhatsAppIcon />
+                      Share on WhatsApp
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </main>
       </div>
     </AppShell>
   );

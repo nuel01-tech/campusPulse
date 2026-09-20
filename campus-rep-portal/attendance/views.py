@@ -34,9 +34,9 @@ class CheckInView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        if not request.user.matric_number:
+        if request.user.role == 'STUDENT' and not request.user.registration_completed:
             return Response(
-                {"detail": "Please add your matric number before checking in."},
+                {"detail": "Complete registration with your matric number, WhatsApp number, and class representative code before checking in."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -222,7 +222,8 @@ class MySessionsView(generics.ListAPIView):
 
     def get_queryset(self):
         return LectureSession.objects.filter(
-            department=self.request.user.department
+            department=self.request.user.department,
+            level=self.request.user.level,
         ).order_by('-created_at')
 class MyStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -433,7 +434,10 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
-    rep_name = serializers.CharField(source='rep.get_full_name', read_only=True)
+    rep_name = serializers.SerializerMethodField()
+
+    def get_rep_name(self, obj):
+        return obj.rep.get_full_name() or obj.rep.username
 
     class Meta:
         model = AuditLog

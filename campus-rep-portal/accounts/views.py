@@ -1,5 +1,3 @@
-from logging import config
-
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password
@@ -68,16 +66,31 @@ class UpdateMatricView(APIView):
         class_code = (request.data.get('class_code') or '').strip().upper()
         phone_number = (request.data.get('phone_number') or '').strip()
 
-        if matric_number:
-            user.matric_number = matric_number
-        if phone_number:
-            user.phone_number = phone_number
+        if user.role == 'STUDENT':
+            if not matric_number or not phone_number or not class_code:
+                return Response(
+                    {'detail': 'Matric number, WhatsApp number, and class representative code are required to complete registration.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        if level and str(level) != str(user.level):
-            expected_code = ClassCode.objects.filter(department=user.department, level=level).first()
+            selected_level = level or user.level
+            expected_code = ClassCode.objects.filter(
+                department=user.department, level=selected_level
+            ).first()
             if not expected_code or expected_code.code.upper() != class_code:
                 return Response({'detail': 'Invalid class code for the selected level.'}, status=status.HTTP_400_BAD_REQUEST)
-            user.level = level
+
+            user.matric_number = matric_number
+            user.phone_number = phone_number
+            user.level = selected_level
+            user.registration_completed = True
+        else:
+            if matric_number:
+                user.matric_number = matric_number
+            if phone_number:
+                user.phone_number = phone_number
+            if level:
+                user.level = level
 
         try:
             user.full_clean(exclude=['password'])
@@ -90,6 +103,7 @@ class UpdateMatricView(APIView):
             'matric_number': user.matric_number,
             'level': user.level,
             'phone_number': user.phone_number,
+            'registration_completed': user.registration_completed,
         })
 
 
@@ -228,6 +242,8 @@ class ClassmatesView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if not user.department or not user.level:
+            return User.objects.none()
         qs = User.objects.filter(
             department=user.department,
             level=user.level,

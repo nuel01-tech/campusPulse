@@ -1,115 +1,211 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
-import api from '../api/axios';
-import AppShell from '../components/AppShell';
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+import api from "../api/axios";
+import AppShell from "../components/AppShell";
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 5.5v16" />
+      <path d="M8 7h8" />
+      <path d="M8 11h7" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 12h13" />
+      <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
 
 function Settings() {
-  const navigate = useNavigate();
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [matricNumber, setMatricNumber] = useState('');
-  const [level, setLevel] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [profile, setProfile] = useState(null);
+
   let user = {};
-  try { const t = localStorage.getItem('access'); user = t ? jwtDecode(t) : {}; } catch {}
 
-  const password = async (e) => {
-    e.preventDefault(); setError(''); setMessage('');
-    try {
-      await api.patch('/accounts/change-password/', { current_password: currentPassword, new_password: newPassword });
-      setMessage('Password updated successfully.');
-      setCurrentPassword(''); setNewPassword('');
-    } catch (e) { setError(e.response?.data?.detail || 'Failed to update password.'); }
-  };
+  try {
+    const token = localStorage.getItem("access");
+    user = token ? jwtDecode(token) : {};
+  } catch {}
 
-  const phone = async (e) => {
-    e.preventDefault(); setError(''); setMessage('');
-    try {
-      await api.patch('/accounts/update-matric/', { phone_number: phoneNumber });
-      setMessage('Phone number updated.');
-    } catch (e) { setError(e.response?.data?.detail || 'Failed to update phone number.'); }
-  };
+  const role = user.role === "CLASS_REP" ? "CLASS_REP" : "STUDENT";
 
-  const matric = async (e) => {
-    e.preventDefault(); setError(''); setMessage('');
-    try {
-      await api.patch('/accounts/update-matric/', { matric_number: matricNumber });
-      setMessage('Matric number saved.');
-    } catch (e) { setError(e.response?.data?.detail || 'Failed to save matric number.'); }
-  };
+  useEffect(() => {
+    let mounted = true;
 
-  const updateLevel = async (e) => {
-    e.preventDefault(); setError(''); setMessage('');
-    try {
-      await api.patch('/accounts/update-matric/', { level });
-      setMessage('Level updated.');
-    } catch (e) { setError(e.response?.data?.detail || 'Failed to update level.'); }
-  };
+    const loadProfile = async () => {
+      try {
+        const response = await api.get("/accounts/profile/");
+
+        if (mounted) {
+          setProfile(response.data);
+        }
+      } catch {
+        // Keep JWT information as the fallback.
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const username = profile?.username || user.username || "Student";
+
+  const firstName = profile?.first_name || username;
+
+  const email = profile?.email || "";
+
+  const initials = username.slice(0, 2).toUpperCase();
 
   return (
-    <AppShell role={user.role === 'CLASS_REP' ? 'CLASS_REP' : 'STUDENT'}>
-      <div className="dashboard-head settings-head">
-        <div><span className="eyebrow">Account</span><h1>Settings & profile.</h1><p>Manage your account details and security preferences.</p></div>
-      </div>
-      {(message || error) && <div className={`notice ${message ? 'success' : 'error'}`}>{message || error}</div>}
-      <div className="settings-layout">
-        <aside className="settings-menu"><button className="active">Profile</button><button>Security</button><button>Preferences</button></aside>
-        <div className="settings-content">
-          <section className="panel profile-card">
-            <div className="profile-hero">
-              <div className="avatar large">{(user.username || 'S').slice(0, 1).toUpperCase()}</div>
-              <div><span className="eyebrow">Signed in as</span><h2>{user.username || 'Student'}</h2><p>{user.role === 'CLASS_REP' ? 'Class representative' : 'Student'} account</p></div>
-            </div>
-            <div className="detail-grid">
-              <div><span>Username</span><strong>{user.username || '—'}</strong></div>
-              <div><span>Role</span><strong>{user.role === 'CLASS_REP' ? 'Class Representative' : 'Student'}</strong></div>
-            </div>
-          </section>
+    <AppShell role={role}>
+      <div className="cp-settings-home">
+        <header className="cp-settings-home-header">
+          <div>
+            <span className="cp-settings-eyebrow">
+              <span className="cp-settings-eyebrow-dot" />
+              Account
+            </span>
 
-          {user.role !== 'CLASS_REP' && (
-            <section className="panel">
-              <div className="panel-head"><div><span className="eyebrow">Academic</span><h2>Matric number & level</h2></div></div>
-              <p className="muted-copy">Required before you can check in to a class.</p>
-              <form className="inline-form" onSubmit={matric}>
-                <input value={matricNumber} onChange={e => setMatricNumber(e.target.value)} placeholder="e.g. OOU/2021/CSC/001" />
-                <button className="button dark">Save</button>
-              </form>
-              <form className="inline-form" onSubmit={updateLevel} style={{ marginTop: '10px' }}>
-                <select value={level} onChange={e => setLevel(e.target.value)}>
-                  <option value="">Select level</option>
-                  <option value="100">100 Level</option>
-                  <option value="200">200 Level</option>
-                  <option value="300">300 Level</option>
-                  <option value="400">400 Level</option>
-                  <option value="500">500 Level</option>
-                </select>
-                <button className="button dark">Save</button>
-              </form>
-            </section>
-          )}
+            <h1>Settings</h1>
 
-          <section className="panel">
-            <div className="panel-head"><div><span className="eyebrow">Contact</span><h2>Phone number</h2></div></div>
-            <form className="inline-form" onSubmit={phone}>
-              <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="e.g. 08012345678" />
-              <button className="button dark">Save</button>
-            </form>
-          </section>
+            <p>
+              Manage your profile, security and notification preferences from
+              one place.
+            </p>
+          </div>
+        </header>
 
-          <section className="panel">
-            <div className="panel-head"><div><span className="eyebrow">Security</span><h2>Change password</h2></div></div>
-            <form className="form-grid one-column" onSubmit={password}>
-              <label>Current password<input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required /></label>
-              <label>New password<input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required /></label>
-              <div className="form-actions"><button className="button primary">Update password</button></div>
-            </form>
-          </section>
+        <section className="cp-settings-account">
+          <div className="cp-settings-account-avatar">{initials}</div>
+
+          <div className="cp-settings-account-info">
+            <span className="cp-settings-account-label">Signed in as</span>
+
+            <h2>{firstName}</h2>
+
+            <p>
+              {role === "CLASS_REP"
+                ? "Class representative account"
+                : "Student account"}
+              {email ? ` · ${email}` : ""}
+            </p>
+          </div>
+
+          <Link to="/profile" className="cp-settings-account-action">
+            View profile
+            <ArrowIcon />
+          </Link>
+        </section>
+
+        <div className="cp-settings-home-grid">
+          <Link to="/profile" className="cp-settings-option">
+            <span className="cp-settings-option-icon profile">
+              <UserIcon />
+            </span>
+
+            <span className="cp-settings-option-content">
+              <strong>Profile details</strong>
+              <span>Manage your academic and contact information.</span>
+            </span>
+
+            <ArrowIcon />
+          </Link>
+
+          <Link to="/security" className="cp-settings-option">
+            <span className="cp-settings-option-icon security">
+              <LockIcon />
+            </span>
+
+            <span className="cp-settings-option-content">
+              <strong>Security &amp; password</strong>
+              <span>Change your password and protect your account.</span>
+            </span>
+
+            <ArrowIcon />
+          </Link>
+
+          <Link to="/preferences" className="cp-settings-option">
+            <span className="cp-settings-option-icon preferences">
+              <BellIcon />
+            </span>
+
+            <span className="cp-settings-option-content">
+              <strong>Notification preferences</strong>
+              <span>Choose which alerts and updates you receive.</span>
+            </span>
+
+            <ArrowIcon />
+          </Link>
+
+          <Link to="/documents" className="cp-settings-option">
+            <span className="cp-settings-option-icon documents">
+              <BookIcon />
+            </span>
+
+            <span className="cp-settings-option-content">
+              <strong>Class documents</strong>
+              <span>Access course materials and shared documents.</span>
+            </span>
+
+            <ArrowIcon />
+          </Link>
         </div>
+
+        <section className="cp-settings-help">
+          <div>
+            <span className="cp-settings-help-label">Account settings</span>
+
+            <h2>Keep your information up to date.</h2>
+
+            <p>
+              Accurate academic and contact information helps CampusPulse
+              maintain reliable attendance records and communication.
+            </p>
+          </div>
+
+          <Link to="/profile" className="cp-settings-help-button">
+            Review profile
+            <ArrowIcon />
+          </Link>
+        </section>
       </div>
-      <button className="back-link" onClick={() => navigate(-1)}>← Back</button>
     </AppShell>
   );
 }
