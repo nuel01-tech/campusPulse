@@ -242,6 +242,8 @@ class ClassmatesView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if not user.department or not user.level:
+            return User.objects.none()
         qs = User.objects.filter(
             department=user.department,
             level=user.level,

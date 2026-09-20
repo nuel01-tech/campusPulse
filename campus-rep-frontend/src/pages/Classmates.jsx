@@ -396,12 +396,37 @@ function Classmates() {
     setError("");
 
     try {
-      const response = await api.get("/accounts/classmates/");
-      setClassmates(response.data || []);
+      const [classmatesRes, profileRes] = await Promise.allSettled([
+        api.get("/accounts/classmates/"),
+        api.get("/accounts/profile/"),
+      ]);
+
+      if (classmatesRes.status === "fulfilled") {
+        const raw = classmatesRes.value.data;
+        const data = Array.isArray(raw) ? raw : raw?.results || [];
+        setClassmates(data);
+      } else {
+        const err = classmatesRes.reason;
+        if (!err?.response) {
+          setError("Unable to connect to the server. Make sure the backend server is running.");
+        } else {
+          setError(
+            err.response?.data?.detail ||
+              "Unable to load your classmates. Please try again.",
+          );
+        }
+      }
+
+      if (profileRes.status === "fulfilled") {
+        const p = profileRes.value.data;
+        if (!p.department || !p.level) {
+          setError(
+            "Your department or current level is not set. Please update your profile to see your classmates.",
+          );
+        }
+      }
     } catch {
-      setError(
-        "Unable to load your classmates. Make sure your profile level and department are configured.",
-      );
+      setError("An unexpected error occurred while loading your classmates.");
     } finally {
       setLoading(false);
     }

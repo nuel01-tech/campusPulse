@@ -176,17 +176,39 @@ function Signup() {
 
       navigate("/login");
     } catch (e) {
+      if (!e.response) {
+        setError("Unable to connect to the backend server. Please check if the backend server is running.");
+        return;
+      }
+
       const serverError = e.response?.data;
+      let message = "";
 
-      const message =
-        serverError?.department?.[0] ||
-        serverError?.username?.[0] ||
-        serverError?.email?.[0] ||
-        serverError?.terms_accepted?.[0] ||
-        serverError?.detail ||
-        "Signup failed. Please check your details and class code.";
+      if (typeof serverError === "string") {
+        message = serverError;
+      } else if (serverError && typeof serverError === "object") {
+        // Look for common specific error fields first or pick the first error key returned by DRF
+        const fieldError =
+          serverError.username?.[0] ||
+          serverError.email?.[0] ||
+          serverError.password?.[0] ||
+          serverError.department?.[0] ||
+          serverError.level?.[0] ||
+          serverError.terms_accepted?.[0] ||
+          serverError.non_field_errors?.[0] ||
+          serverError.detail;
 
-      setError(message);
+        if (fieldError) {
+          message = fieldError;
+        } else {
+          const firstKey = Object.keys(serverError)[0];
+          const val = serverError[firstKey];
+          const text = Array.isArray(val) ? val[0] : val;
+          message = text ? `${firstKey.replace('_', ' ')}: ${text}` : "";
+        }
+      }
+
+      setError(message || "Signup failed. Please check your details.");
     } finally {
       setSubmitting(false);
     }

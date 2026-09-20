@@ -19,10 +19,14 @@ class SignupSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         department = attrs.get('department')
         level = attrs.get('level')
+        email = attrs.get('email')
+
         if not department or not level:
             raise serializers.ValidationError({'department': 'Department and level are required.'})
         if not attrs.get('terms_accepted'):
             raise serializers.ValidationError({'terms_accepted': 'You must accept the Terms & Conditions.'})
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({'email': 'A user with that email address already exists.'})
 
         return attrs
 
