@@ -74,6 +74,10 @@
   --cp-sidebar-width: 248px;
   --cp-topbar-height: 68px;
   --cp-content-max: 1440px;
+
+  /* Typography — fonts already loaded in index.html */
+  --cp-font-body: "Plus Jakarta Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --cp-font-display: "Outfit", "Plus Jakarta Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
 /* =========================================================
@@ -17812,6 +17816,27 @@ tbody tr:hover {
 .cp-install-app:hover {
   transform: translateY(-1px);
   box-shadow: var(--cp-shadow-md);
+}
+
+/* =========================================================
+   TYPOGRAPHY
+   Wires up the webfonts already loaded in index.html so text
+   no longer silently falls back to the system font. Body and
+   controls use Plus Jakarta Sans; display headings use Outfit.
+   ========================================================= */
+
+body {
+  font-family: var(--cp-font-body);
+}
+
+h1,
+h2,
+h3,
+.dashboard-head h1,
+.cp-signup-heading h2,
+.cp-auth-heading h2 {
+  font-family: var(--cp-font-display);
+  text-wrap: balance;
 }
 
 /* Respect reduced motion globally. */
