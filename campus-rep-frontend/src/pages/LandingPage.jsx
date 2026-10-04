@@ -1,10 +1,16 @@
 import { Link, useNavigate } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 function LandingPage() {
   const navigate = useNavigate();
 
   return (
     <div className="landing-page">
+      <Seo
+        title="CampusPulse — GPS Attendance & Class Management for OOU"
+        description="GPS-verified attendance, live lecture sessions and department announcements for OOU students and class reps."
+        path="/"
+      />
       <header className="landing-nav container-wide">
         <div className="brand">
           <span className="brand-mark">CP</span>
