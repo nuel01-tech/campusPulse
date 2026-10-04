@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import api from '../api/axios';
+import Seo from '../components/Seo';
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -29,6 +30,7 @@ function Login() {
 
   return (
     <div className="auth-page">
+      <Seo title="Log in | CampusPulse" description="Log in to CampusPulse." path="/login" noindex />
       <div className="auth-side">
         <div className="brand light-brand">
           <span className="brand-mark">CP</span>
