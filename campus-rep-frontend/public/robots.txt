@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /student
+Disallow: /rep
+Disallow: /settings
+Disallow: /profile
+Disallow: /security
+Disallow: /preferences
+Disallow: /notifications
+Disallow: /documents
+Disallow: /reset-password/
+
+Sitemap: https://campusoou.netlify.app/sitemap.xml
