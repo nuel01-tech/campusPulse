@@ -2,16 +2,68 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- FIX: removed maximum-scale=1.0 and user-scalable=no (hurts accessibility / Lighthouse SEO score) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#2563EB" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.png" />
+    <!-- FIX: type now matches the PNG file -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <title>CampusPulse — University Attendance & Class Management</title>
+
+    <!-- SEO -->
+    <title>CampusPulse — GPS Attendance & Class Management for OOU Students</title>
+    <meta name="description" content="CampusPulse is a campus attendance and class management platform for OOU students and class reps. GPS-verified check-in, live lecture sessions, department announcements and attendance tracking." />
+    <meta name="keywords" content="CampusPulse, OOU attendance, class rep portal, university attendance app, GPS attendance, Olabisi Onabanjo University, student announcements" />
+    <meta name="author" content="CodewithNUEL" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://campusoou.netlify.app/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CampusPulse" />
+    <meta property="og:title" content="CampusPulse — GPS Attendance & Class Management for OOU" />
+    <meta property="og:description" content="GPS-verified attendance, live lecture sessions and department announcements for students and class reps." />
+    <meta property="og:url" content="https://campusoou.netlify.app/" />
+    <meta property="og:image" content="https://campusoou.netlify.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_NG" />
+
+    <!-- X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CampusPulse — GPS Attendance & Class Management for OOU" />
+    <meta name="twitter:description" content="GPS-verified attendance, live lecture sessions and department announcements for students and class reps." />
+    <meta name="twitter:image" content="https://campusoou.netlify.app/og-image.png" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "CampusPulse",
+          "url": "https://campusoou.netlify.app/"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "CampusPulse",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "Web, Android, iOS (installable PWA)",
+          "description": "Campus attendance and department-communication platform for class representatives and students, with GPS-verified check-in and live session management.",
+          "url": "https://campusoou.netlify.app/",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "NGN" },
+          "author": { "@type": "Person", "name": "CodewithNUEL" }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
+    <noscript>CampusPulse is a campus attendance and class management app for OOU students and class reps. Please enable JavaScript to use it.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
