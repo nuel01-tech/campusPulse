@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import Seo from '../components/Seo';
 
 function Signup() {
   const [form, setForm] = useState({
@@ -110,6 +111,11 @@ function Signup() {
 
   return (
     <div className="auth-page signup-page">
+      <Seo
+        title="Create Account | CampusPulse"
+        description="Sign up for CampusPulse to check in to lectures with GPS and get department announcements."
+        path="/signup"
+      />
       <div className="auth-side">
         <div className="brand light-brand">
           <span className="brand-mark">CP</span>
