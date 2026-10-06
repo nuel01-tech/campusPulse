@@ -12,26 +12,43 @@ class SignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'username', 'first_name', 'last_name', 'email', 'password',
-            'department', 'level', 'terms_accepted'
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'password',
+            'department',
+            'level',
+            'terms_accepted',
         ]
 
     def validate(self, attrs):
         department = attrs.get('department')
         level = attrs.get('level')
+        email = attrs.get('email')
+
         if not department or not level:
-            raise serializers.ValidationError({'department': 'Department and level are required.'})
+            raise serializers.ValidationError({
+                'department': 'Department and level are required.'
+            })
+
         if not attrs.get('terms_accepted'):
-            raise serializers.ValidationError({'terms_accepted': 'You must accept the Terms & Conditions.'})
+            raise serializers.ValidationError({
+                'terms_accepted': 'You must accept the Terms & Conditions.'
+            })
+
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({
+                'email': 'A user with that email address already exists.'
+            })
 
         return attrs
 
     def create(self, validated_data):
         validated_data.pop('terms_accepted', None)
         validated_data['terms_accepted_at'] = timezone.now()
+
         return User.objects.create_user(**validated_data)
-
-
 class UserProfileSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     faculty = serializers.CharField(source='department.faculty', read_only=True, allow_null=True)

@@ -9,14 +9,14 @@ This pass is a UI/UX redesign only. Existing routes, API calls, authentication f
 - Desktop page gutter: `32px`
 - Primary spacing rhythm: `4px / 8px` increments
 - Section spacing: `64px / 80px`
-- Font: Inter
+- Font: Plus Jakarta Sans (body/UI) with Outfit for display headings — both loaded in index.html
 - Body: `16px / 1.5`
 - Desktop H1: up to `64px`
 - Desktop H2: up to `48px`
 - Desktop H3: up to `28px`
 - Controls: `40px / 44px / 48px` depending on context
 - Standard radius: `8px`; pills use `999px`
-- Primary accent: blue
+- Primary accent: CampusPulse green
 - Neutral system: white / slate canvas / slate text / slate borders
 
 ## Accessibility

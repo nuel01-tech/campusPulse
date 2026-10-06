@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
@@ -47,3 +48,119 @@ class PushSubscription(models.Model):
 
     class Meta:
         unique_together = ('user', 'endpoint')
+class PasskeyCredential(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="passkeys",
+    )
+
+    credential_id = models.BinaryField(
+        unique=True,
+    )
+
+    public_key = models.BinaryField()
+
+    sign_count = models.PositiveIntegerField(
+        default=0,
+    )
+
+    device_type = models.CharField(
+        max_length=30,
+        blank=True,
+    )
+
+    backed_up = models.BooleanField(
+        default=False,
+    )
+
+    device_name = models.CharField(
+        max_length=100,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} passkey"
+    
+class PasskeyChallenge(models.Model):
+    CHALLENGE_TYPES = (
+        ("REGISTRATION", "Registration"),
+        ("AUTHENTICATION", "Authentication"),
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="passkey_challenges",
+    )
+
+    challenge = models.BinaryField()
+
+    challenge_type = models.CharField(
+        max_length=20,
+        choices=CHALLENGE_TYPES,
+    )
+
+    session_id = models.PositiveBigIntegerField(
+    null=True,
+    blank=True,
+)
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    expires_at = models.DateTimeField()
+
+    used = models.BooleanField(
+        default=False,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user", "challenge_type", "used"]
+            ),
+        ]
+class AttendancePasskeyGrant(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="attendance_passkey_grants",
+    )
+
+    session_id = models.PositiveBigIntegerField(
+    null=True,
+    blank=True,
+)
+
+    token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    expires_at = models.DateTimeField()
+
+    used = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Attendance passkey grant for {self.user.username}"

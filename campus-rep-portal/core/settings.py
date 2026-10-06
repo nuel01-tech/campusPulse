@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
@@ -196,3 +196,23 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# ============================================================
+# WEBAUTHN / PASSKEY SETTINGS
+# ============================================================
+
+WEBAUTHN_RP_ID = os.getenv(
+    "WEBAUTHN_RP_ID",
+    "localhost",
+)
+
+WEBAUTHN_RP_NAME = os.getenv(
+    "WEBAUTHN_RP_NAME",
+    "CampusPulse",
+)
+
+WEBAUTHN_ORIGIN = os.getenv(
+    "WEBAUTHN_ORIGIN",
+    "http://localhost:5173",
+)

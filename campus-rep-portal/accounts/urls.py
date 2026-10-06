@@ -2,7 +2,9 @@ from django.urls import path
 from .views import (
     ChangePasswordView, ClassmatesView, DeleteStudentAccountView, DepartmentListView,
     ForgotPasswordView, MyProfileView, PreferencesView, ResetPasswordView,
-    SaveSubscriptionView, SignupView, ToggleSuspendStudentView, UpdateMatricView,
+    SaveSubscriptionView, SignupView, ToggleSuspendStudentView, UpdateMatricView,PasskeyRegistrationOptionsView,
+PasskeyRegistrationVerifyView,PasskeyAuthenticationOptionsView,
+PasskeyAuthenticationVerifyView,
 )
 
 urlpatterns = [
@@ -18,4 +20,26 @@ urlpatterns = [
     path('classmates/', ClassmatesView.as_view(), name='classmates'),
     path('classmates/<int:pk>/toggle-suspend/', ToggleSuspendStudentView.as_view(), name='toggle-suspend-student'),
     path('classmates/<int:pk>/delete-account/', DeleteStudentAccountView.as_view(), name='delete-student-account'),
+    path(
+    "passkeys/register/options/",
+    PasskeyRegistrationOptionsView.as_view(),
+    name="passkey-register-options",
+),
+
+path(
+    "passkeys/register/verify/",
+    PasskeyRegistrationVerifyView.as_view(),
+    name="passkey-register-verify",
+),
+path(
+    "passkeys/auth/options/",
+    PasskeyAuthenticationOptionsView.as_view(),
+    name="passkey-auth-options",
+),
+
+path(
+    "passkeys/auth/verify/",
+    PasskeyAuthenticationVerifyView.as_view(),
+    name="passkey-auth-verify",
+),
 ]
