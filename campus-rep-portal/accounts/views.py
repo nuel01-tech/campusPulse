@@ -401,56 +401,72 @@ class PasskeyRegistrationOptionsView(APIView):
     def post(self, request):
         user = request.user
 
-        # Remove old unused registration challenges.
-        PasskeyChallenge.objects.filter(
-            user=user,
-            challenge_type="REGISTRATION",
-            used=False,
-            expires_at__lt=timezone.now(),
-        ).update(used=True)
+        try:
+            print("PASSKEY DEBUG: user =", user.username)
+            print("PASSKEY DEBUG: user id =", user.id)
 
-        # Prevent registering the same device/credential again.
-        existing_credentials = PasskeyCredential.objects.filter(
-            user=user,
-            is_active=True,
-        )
+            existing_credentials = PasskeyCredential.objects.filter(
+                user=user,
+                is_active=True,
+            )
 
-        options = generate_registration_options(
-            rp_id=settings.WEBAUTHN_RP_ID,
-            rp_name=settings.WEBAUTHN_RP_NAME,
-            user_id=str(user.id).encode("utf-8"),
-            user_name=user.username,
-            user_display_name=(
-                user.get_full_name()
-                or user.username
-            ),
-            authenticator_selection=AuthenticatorSelectionCriteria(
-                authenticator_attachment=AuthenticatorAttachment.PLATFORM,
-                resident_key=ResidentKeyRequirement.REQUIRED,
-                user_verification=UserVerificationRequirement.REQUIRED,
-            ),
+            print(
+                "PASSKEY DEBUG: existing credentials =",
+                existing_credentials.count(),
+            )
 
-            exclude_credentials=[
-    PublicKeyCredentialDescriptor(
-        id=credential.credential_id,
-        transports=[],
-    )
-    for credential in existing_credentials
-],
-        )
+            options = generate_registration_options(
+                rp_id=settings.WEBAUTHN_RP_ID,
+                rp_name=settings.WEBAUTHN_RP_NAME,
+                user_id=str(user.id).encode("utf-8"),
+                user_name=user.username,
+                user_display_name=(
+                    user.get_full_name()
+                    or user.username
+                ),
+                authenticator_selection=AuthenticatorSelectionCriteria(
+                    authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+                    resident_key=ResidentKeyRequirement.REQUIRED,
+                    user_verification=UserVerificationRequirement.REQUIRED,
+                ),
+                exclude_credentials=[
+                    PublicKeyCredentialDescriptor(
+                        id=credential.credential_id,
+                        transports=[],
+                    )
+                    for credential in existing_credentials
+                ],
+            )
 
-        # Save the challenge so we can verify it later.
-        challenge = PasskeyChallenge.objects.create(
-            user=user,
-            challenge=options.challenge,
-            challenge_type="REGISTRATION",
-            expires_at=timezone.now() + timedelta(minutes=5),
-        )
+            print("PASSKEY DEBUG: options generated successfully")
 
-        return Response({
-            "options": options_to_json(options),
-            "challenge_id": challenge.id,
-        })
+            challenge = PasskeyChallenge.objects.create(
+                user=user,
+                challenge=options.challenge,
+                challenge_type="REGISTRATION",
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+
+            print("PASSKEY DEBUG: challenge created =", challenge.id)
+
+            return Response({
+                "options": options_to_json(options),
+                "challenge_id": challenge.id,
+            })
+
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+
+            return Response(
+                {
+                    "detail": "Passkey registration options failed.",
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+                status=500,
+            )
 
 class PasskeyRegistrationVerifyView(APIView):
     permission_classes = [IsAuthenticated]

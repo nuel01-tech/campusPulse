@@ -1,4 +1,6 @@
+
 import { useState } from "react";
+import { startRegistration } from "@simplewebauthn/browser";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import AppShell from "../components/AppShell";
@@ -57,6 +59,10 @@ function Security() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeyMessage, setPasskeyMessage] = useState("");
+  const [passkeyError, setPasskeyError] = useState("");
+
   let role = "STUDENT";
 
   try {
@@ -76,7 +82,9 @@ function Security() {
     }
 
     if (currentPassword === newPassword) {
-      setError("Your new password must be different from your current password.");
+      setError(
+        "Your new password must be different from your current password.",
+      );
       return;
     }
 
@@ -94,6 +102,7 @@ function Security() {
       setConfirm("");
     } catch (e) {
       const responseError = e.response?.data;
+
       const validationError = Object.values(responseError || {})
         .flat()
         .find((value) => typeof value === "string");
@@ -104,6 +113,50 @@ function Security() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasskeyRegistration = async () => {
+    setPasskeyLoading(true);
+    setPasskeyMessage("");
+    setPasskeyError("");
+
+    try {
+      // Ask Django for a WebAuthn registration challenge.
+      const optionsResponse = await api.post(
+  "/accounts/passkeys/register/options/",
+);
+
+console.log("PASSKEY BACKEND RESPONSE:", optionsResponse.data);
+console.log("PASSKEY OPTIONS:", optionsResponse.data.options);
+
+const options = JSON.parse(optionsResponse.data.options);
+
+      // Ask the device to create the passkey.
+      const registrationResponse = await startRegistration({
+        optionsJSON: options,
+      });
+
+      // Send the completed passkey back to Django.
+      await api.post("/accounts/passkeys/register/verify/", {
+        credential: registrationResponse,
+        device_name: "My device",
+        challenge_id: optionsResponse.data.challenge_id,
+      });
+
+      setPasskeyMessage(
+        "Passkey registered successfully. You can now mark attendance securely.",
+      );
+    } catch (err) {
+      console.error("Passkey registration error:", err);
+
+      setPasskeyError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Could not register your passkey. Please try again.",
+      );
+    } finally {
+      setPasskeyLoading(false);
     }
   };
 
@@ -188,7 +241,9 @@ function Security() {
 
         {(message || error) && (
           <div
-            className={`cp-security-feedback ${message ? "success" : "error"}`}
+            className={`cp-security-feedback ${
+              message ? "success" : "error"
+            }`}
             role="alert"
           >
             <span className="cp-security-feedback-icon">
@@ -196,7 +251,10 @@ function Security() {
             </span>
 
             <div>
-              <strong>{message ? "Password updated" : "Update failed"}</strong>
+              <strong>
+                {message ? "Password updated" : "Update failed"}
+              </strong>
+
               <span>{message || error}</span>
             </div>
           </div>
@@ -206,7 +264,9 @@ function Security() {
           <section className="cp-security-card cp-security-password-card">
             <div className="cp-security-card-header">
               <div>
-                <span className="cp-security-section-label">Credentials</span>
+                <span className="cp-security-section-label">
+                  Credentials
+                </span>
 
                 <h2>Change password</h2>
 
@@ -287,6 +347,7 @@ function Security() {
                   ) : (
                     <>
                       Update password
+
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M5 12h13" />
                         <path d="m13 6 6 6-6 6" />
@@ -296,6 +357,89 @@ function Security() {
                 </button>
               </div>
             </form>
+
+            {/* PASSKEY SECURITY */}
+            <div className="cp-security-passkey-section">
+              <div className="cp-security-card-header">
+                <div>
+                  <span className="cp-security-section-label">
+                    Attendance security
+                  </span>
+
+                  <h2>Set up your passkey</h2>
+
+                  <p>
+                    CampusPulse requires a passkey before you can mark
+                    attendance. Your device will use Face ID, fingerprint, or
+                    your device PIN to verify that it is really you.
+                  </p>
+                </div>
+
+                <span className="cp-security-status">
+                  <span />
+                  Required
+                </span>
+              </div>
+
+              {passkeyMessage && (
+                <div
+                  className="cp-security-feedback success"
+                  role="alert"
+                >
+                  <span className="cp-security-feedback-icon">
+                    <CheckIcon />
+                  </span>
+
+                  <div>
+                    <strong>Passkey ready</strong>
+                    <span>{passkeyMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              {passkeyError && (
+                <div
+                  className="cp-security-feedback error"
+                  role="alert"
+                >
+                  <span className="cp-security-feedback-icon">!</span>
+
+                  <div>
+                    <strong>Passkey setup failed</strong>
+                    <span>{passkeyError}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="cp-security-form-footer">
+                <span>
+                  You only need to set up your passkey once on this device.
+                </span>
+
+                <button
+                  type="button"
+                  className="cp-security-submit"
+                  onClick={handlePasskeyRegistration}
+                  disabled={passkeyLoading}
+                >
+                  {passkeyLoading ? (
+                    <>
+                      <span className="cp-security-spinner" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      Set up passkey
+
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h13" />
+                        <path d="m13 6 6 6-6 6" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </section>
 
           <aside className="cp-security-card cp-security-guidelines">
