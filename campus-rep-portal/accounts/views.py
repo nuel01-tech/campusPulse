@@ -13,6 +13,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 from attendance.models import ClassCode
+from accounts.models import AttendancePasskeyGrant
 from .models import Department, PushSubscription, User
 from .push import send_push_to_user
 import traceback
@@ -20,7 +21,36 @@ from .serializers import (
     MyTokenObtainPairSerializer, PreferencesSerializer, SignupSerializer,
     UserProfileSerializer, StudentClassmateSerializer, RepClassmateSerializer,
 )
+from datetime import timedelta
 
+from django.conf import settings
+from django.utils import timezone
+
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from webauthn import (
+    generate_registration_options,
+    verify_registration_response,
+    generate_authentication_options,
+    options_to_json,
+)
+
+from webauthn.helpers.structs import (
+    AuthenticatorAttachment,
+    AuthenticatorSelectionCriteria,
+    ResidentKeyRequirement,
+    UserVerificationRequirement,
+)
+
+from webauthn.helpers.exceptions import WebAuthnException
+from webauthn.helpers.structs import PublicKeyCredentialDescriptor
+from .models import (
+    PasskeyCredential,
+    PasskeyChallenge,
+    AttendancePasskeyGrant,
+)
 
 class DepartmentListView(generics.ListAPIView):
     queryset = Department.objects.all().order_by('name')
@@ -364,3 +394,359 @@ class DeleteStudentAccountView(APIView):
         student_name = student.get_full_name() or student.username
         student.delete()
         return Response({'detail': f"Account '{student_name}' was deleted successfully."})
+
+class PasskeyRegistrationOptionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        # Remove old unused registration challenges.
+        PasskeyChallenge.objects.filter(
+            user=user,
+            challenge_type="REGISTRATION",
+            used=False,
+            expires_at__lt=timezone.now(),
+        ).update(used=True)
+
+        # Prevent registering the same device/credential again.
+        existing_credentials = PasskeyCredential.objects.filter(
+            user=user,
+            is_active=True,
+        )
+
+        options = generate_registration_options(
+            rp_id=settings.WEBAUTHN_RP_ID,
+            rp_name=settings.WEBAUTHN_RP_NAME,
+            user_id=str(user.id).encode("utf-8"),
+            user_name=user.username,
+            user_display_name=(
+                user.get_full_name()
+                or user.username
+            ),
+            authenticator_selection=AuthenticatorSelectionCriteria(
+                authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+                resident_key=ResidentKeyRequirement.REQUIRED,
+                user_verification=UserVerificationRequirement.REQUIRED,
+            ),
+
+            exclude_credentials=[
+    PublicKeyCredentialDescriptor(
+        id=credential.credential_id,
+        transports=[],
+    )
+    for credential in existing_credentials
+],
+        )
+
+        # Save the challenge so we can verify it later.
+        challenge = PasskeyChallenge.objects.create(
+            user=user,
+            challenge=options.challenge,
+            challenge_type="REGISTRATION",
+            expires_at=timezone.now() + timedelta(minutes=5),
+        )
+
+        return Response({
+            "options": options_to_json(options),
+            "challenge_id": challenge.id,
+        })
+
+class PasskeyRegistrationVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        credential = request.data.get("credential")
+        challenge_id = request.data.get("challenge_id")
+
+        if not credential:
+            return Response(
+                {"detail": "Passkey credential is required."},
+                status=400,
+            )
+
+        if not challenge_id:
+            return Response(
+                {"detail": "Registration challenge is required."},
+                status=400,
+            )
+
+        # Find the challenge created for this student.
+        try:
+            challenge = PasskeyChallenge.objects.get(
+                id=challenge_id,
+                user=user,
+                challenge_type="REGISTRATION",
+                used=False,
+            )
+        except PasskeyChallenge.DoesNotExist:
+            return Response(
+                {"detail": "Invalid or expired registration challenge."},
+                status=400,
+            )
+
+        # A registration challenge only lives for 5 minutes.
+        if challenge.expires_at < timezone.now():
+            challenge.used = True
+            challenge.save(update_fields=["used"])
+
+            return Response(
+                {"detail": "Registration challenge has expired."},
+                status=400,
+            )
+
+        try:
+            verification = verify_registration_response(
+                credential=credential,
+                expected_challenge=challenge.challenge,
+                expected_origin=settings.WEBAUTHN_ORIGIN,
+                expected_rp_id=settings.WEBAUTHN_RP_ID,
+                require_user_verification=True,
+            )
+
+        except WebAuthnException:
+            return Response(
+                {
+                    "detail": (
+                        "Device verification failed. "
+                        "Please try again."
+                    )
+                },
+                status=400,
+            )
+
+        # The challenge is now permanently consumed.
+        challenge.used = True
+        challenge.save(update_fields=["used"])
+
+        # Make absolutely sure this credential isn't already registered.
+        if PasskeyCredential.objects.filter(
+            credential_id=verification.credential_id
+        ).exists():
+            return Response(
+                {"detail": "This passkey is already registered."},
+                status=400,
+            )
+
+        # Save the cryptographic credential.
+        PasskeyCredential.objects.create(
+            user=user,
+            credential_id=verification.credential_id,
+            public_key=verification.credential_public_key,
+            sign_count=verification.sign_count,
+            device_type=verification.credential_device_type.value,
+            backed_up=verification.credential_backed_up,
+            device_name=request.data.get(
+                "device_name",
+                "My device",
+            ),
+        )
+
+        return Response(
+            {
+                "detail": "Passkey registered successfully.",
+            },
+            status=201,
+        )
+class PasskeyAuthenticationOptionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        session_id = request.data.get("session_id")
+
+        if not session_id:
+            return Response(
+                {"detail": "Lecture session is required."},
+                status=400,
+            )
+
+        # Find this student's active passkeys
+        credentials = PasskeyCredential.objects.filter(
+            user=user,
+            is_active=True,
+        )
+
+        # No passkey = student cannot continue to attendance
+        if not credentials.exists():
+            return Response(
+                {
+                    "detail": (
+                        "No passkey is registered for this account. "
+                        "Set up a passkey before marking attendance."
+                    )
+                },
+                status=400,
+            )
+
+        # Mark old unused authentication challenges as expired
+        PasskeyChallenge.objects.filter(
+            user=user,
+            challenge_type="AUTHENTICATION",
+            used=False,
+            expires_at__lt=timezone.now(),
+        ).update(used=True)
+
+        # Create a fresh WebAuthn authentication challenge
+        options = generate_authentication_options(
+            rp_id=settings.WEBAUTHN_RP_ID,
+
+            user_verification=UserVerificationRequirement.REQUIRED,
+
+            allow_credentials=[
+                PublicKeyCredentialDescriptor(
+                    id=credential.credential_id,
+                    transports=[],
+                )
+                for credential in credentials
+            ],
+        )
+
+        # Save the challenge on the server
+        challenge = PasskeyChallenge.objects.create(
+    user=user,
+    challenge=options.challenge,
+    challenge_type="AUTHENTICATION",
+    session_id=int(session_id),
+    expires_at=timezone.now() + timedelta(minutes=5),
+)
+
+        return Response(
+            {
+                "options": options_to_json(options),
+                "challenge_id": challenge.id,
+            }
+        )
+class PasskeyAuthenticationVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        credential = request.data.get("credential")
+        challenge_id = request.data.get("challenge_id")
+
+        if not credential:
+            return Response(
+                {"detail": "Passkey credential is required."},
+                status=400,
+            )
+
+        if not challenge_id:
+            return Response(
+                {"detail": "Authentication challenge is required."},
+                status=400,
+            )
+
+        # Find the challenge that belongs to this logged-in user
+        try:
+            challenge = PasskeyChallenge.objects.get(
+                id=challenge_id,
+                user=user,
+                challenge_type="AUTHENTICATION",
+                used=False,
+            )
+        except PasskeyChallenge.DoesNotExist:
+            return Response(
+                {"detail": "Invalid or expired authentication challenge."},
+                status=400,
+            )
+
+        # Check whether the challenge has expired
+        if challenge.expires_at < timezone.now():
+            challenge.used = True
+            challenge.save(update_fields=["used"])
+
+            return Response(
+                {"detail": "Authentication challenge has expired."},
+                status=400,
+            )
+
+        # Find the passkey credential that belongs to this user
+        credential_id = credential.get("rawId")
+
+        if not credential_id:
+            return Response(
+                {"detail": "Passkey credential ID is missing."},
+                status=400,
+            )
+
+        from webauthn.helpers import base64url_to_bytes
+
+        try:
+            credential_id_bytes = base64url_to_bytes(credential_id)
+        except Exception:
+            return Response(
+                {"detail": "Invalid passkey credential ID."},
+                status=400,
+            )
+
+        try:
+            passkey = PasskeyCredential.objects.get(
+                user=user,
+                credential_id=credential_id_bytes,
+                is_active=True,
+            )
+        except PasskeyCredential.DoesNotExist:
+            return Response(
+                {"detail": "This passkey is not registered to your account."},
+                status=400,
+            )
+
+        # Ask py_webauthn to verify the cryptographic proof
+        try:
+            verification = verify_authentication_response(
+                credential=credential,
+                expected_challenge=challenge.challenge,
+                expected_origin=settings.WEBAUTHN_ORIGIN,
+                expected_rp_id=settings.WEBAUTHN_RP_ID,
+                credential_public_key=passkey.public_key,
+                credential_current_sign_count=passkey.sign_count,
+                require_user_verification=True,
+            )
+        except WebAuthnException:
+            return Response(
+                {
+                    "detail": (
+                        "Device verification failed. "
+                        "Please try again."
+                    )
+                },
+                status=400,
+            )
+
+        # The challenge can never be used again
+        challenge.used = True
+        challenge.save(update_fields=["used"])
+
+        # Update the passkey's security counter
+        passkey.sign_count = verification.new_sign_count
+        passkey.last_used_at = timezone.now()
+        passkey.device_type = verification.credential_device_type.value
+        passkey.backed_up = verification.credential_backed_up
+        passkey.save(
+            update_fields=[
+                "sign_count",
+                "last_used_at",
+                "device_type",
+                "backed_up",
+            ]
+        )
+
+        # Create a short-lived attendance authorization
+        grant = AttendancePasskeyGrant.objects.create(
+    user=user,
+    session_id=challenge.session_id,
+    expires_at=timezone.now() + timedelta(minutes=2),
+)
+
+        return Response(
+        {
+            "detail": "Passkey verification successful.",
+            "verified": True,
+            "attendance_grant": str(grant.token),
+        },
+        status=200,
+    )

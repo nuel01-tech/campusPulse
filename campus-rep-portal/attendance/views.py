@@ -1,3 +1,5 @@
+from requests import request
+
 from rest_framework import generics, permissions
 from .models import LectureSession
 from rest_framework import serializers
@@ -6,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import HttpResponse, FileResponse
 from django.utils.text import get_valid_filename
+from django.utils import timezone
 from django.db import models
 from rest_framework import status
 from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
@@ -18,6 +21,7 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from accounts.models import User
 from accounts.push import send_email_to_user, send_push_to_user
+from accounts.models import AttendancePasskeyGrant
 
 class AnnouncementListView(generics.ListAPIView):
     serializer_class = AnnouncementSerializer
@@ -38,6 +42,53 @@ class CheckInView(APIView):
             return Response(
                 {"detail": "Complete registration with your matric number, WhatsApp number, and class representative code before checking in."},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        # Students must prove their identity with a passkey
+# before they are allowed to mark attendance.
+        if request.user.role == 'STUDENT':
+            attendance_grant_token = request.data.get("attendance_grant")
+
+        if not attendance_grant_token:
+            return Response(
+            {
+                "detail": (
+                    "Passkey verification is required "
+                    "before marking attendance."
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+        try:
+            attendance_grant = AttendancePasskeyGrant.objects.get(
+    token=attendance_grant_token,
+    user=request.user,
+    session_id=pk,
+    used=False,
+)
+        except AttendancePasskeyGrant.DoesNotExist:
+            return Response(
+                {
+                    "detail": (
+                        "Invalid attendance authorization. "
+                        "Please verify your passkey again."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if attendance_grant.expires_at < timezone.now():
+            attendance_grant.used = True
+            attendance_grant.save(update_fields=["used"])
+
+            return Response(
+                {
+                    "detail": (
+                        "Your attendance authorization has expired. "
+                        "Please verify your passkey again."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         try:
@@ -67,8 +118,19 @@ class CheckInView(APIView):
         if not created:
             return Response({"detail": "Already checked in."}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"detail": "Checked in successfully.", "distance_meters": int(distance)}, status=status.HTTP_201_CREATED)
+        # The attendance was successfully created.
+# The passkey grant can now be consumed.
+        if request.user.role == 'STUDENT':
+            attendance_grant.used = True
+            attendance_grant.save(update_fields=["used"])
 
+        return Response(
+            {
+                "detail": "Checked in successfully.",
+                "distance_meters": int(distance),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 class IsClassRep(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == 'CLASS_REP'
