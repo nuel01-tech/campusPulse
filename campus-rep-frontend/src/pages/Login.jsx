@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -21,6 +22,13 @@ function ArrowIcon() {
     </svg>
   );
 }
+=======
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
+import api from '../api/axios';
+import Seo from '../components/Seo';
+>>>>>>> ca72c514c7af5177f6b6393ac54d55922b136504
 
 function Login() {
   const [username, setUsername] = useState("");
@@ -56,6 +64,7 @@ function Login() {
   };
 
   return (
+<<<<<<< HEAD
     <main className="cp-auth-page cp-login-page">
       {/* =====================================================
           INFORMATION PANEL
@@ -64,6 +73,24 @@ function Login() {
         <div className="cp-auth-aside-inner">
           <Link to="/" className="cp-auth-brand" aria-label="CampusPulse home">
             <span className="cp-auth-brand-mark">CP</span>
+=======
+    <div className="auth-page">
+      <Seo title="Log in | CampusPulse" description="Log in to CampusPulse." path="/login" noindex />
+      <div className="auth-side">
+        <div className="brand light-brand">
+          <span className="brand-mark">CP</span>
+          <span>CampusPulse</span>
+        </div>
+        <div className="auth-side-content">
+          <span className="eyebrow light">
+            <span className="eyebrow-dot" /> University attendance, simplified
+          </span>
+          <h1>One clear workspace for the everyday campus routine.</h1>
+          <p>Verify check-in coordinates, coordinate lectures, and stay informed with instant class updates.</p>
+        </div>
+        <span className="auth-side-foot">Olabisi Onabanjo University · Student &amp; Rep Portal</span>
+      </div>
+>>>>>>> ca72c514c7af5177f6b6393ac54d55922b136504
 
             <span className="cp-auth-brand-name">CampusPulse</span>
           </Link>

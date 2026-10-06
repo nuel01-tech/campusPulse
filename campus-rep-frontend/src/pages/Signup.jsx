@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -57,6 +58,12 @@ function RefreshIcon() {
     </svg>
   );
 }
+=======
+import { useEffect, useState, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import Seo from '../components/Seo';
+>>>>>>> ca72c514c7af5177f6b6393ac54d55922b136504
 
 function Signup() {
   const [form, setForm] = useState({
@@ -193,6 +200,7 @@ function Signup() {
   };
 
   return (
+<<<<<<< HEAD
     <div className="cp-auth-page cp-signup-page">
       <aside className="cp-auth-aside">
         <div className="cp-auth-aside-content">
@@ -200,6 +208,28 @@ function Signup() {
             <span className="cp-auth-brand-mark">CP</span>
             <span className="cp-auth-brand-name">CampusPulse</span>
           </Link>
+=======
+    <div className="auth-page signup-page">
+      <Seo
+        title="Create Account | CampusPulse"
+        description="Sign up for CampusPulse to check in to lectures with GPS and get department announcements."
+        path="/signup"
+      />
+      <div className="auth-side">
+        <div className="brand light-brand">
+          <span className="brand-mark">CP</span>
+          <span>CampusPulse</span>
+        </div>
+        <div className="auth-side-content">
+          <span className="eyebrow light">
+            <span className="eyebrow-dot" /> Join your class workspace
+          </span>
+          <h1>Built around the way university communities actually work.</h1>
+          <p>Create your account and keep attendance, sessions and updates in one place.</p>
+        </div>
+        <span className="auth-side-foot">Olabisi Onabanjo University · Student &amp; Rep Portal</span>
+      </div>
+>>>>>>> ca72c514c7af5177f6b6393ac54d55922b136504
 
           <div className="cp-signup-aside-copy">
             <span className="cp-auth-eyebrow cp-auth-eyebrow-light">

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Link, useNavigate } from "react-router-dom";
 
 function ArrowIcon() {
@@ -36,11 +37,16 @@ function CheckIcon() {
     </svg>
   );
 }
+=======
+import { Link, useNavigate } from 'react-router-dom';
+import Seo from '../components/Seo';
+>>>>>>> ca72c514c7af5177f6b6393ac54d55922b136504
 
 function LandingPage() {
   const navigate = useNavigate();
 
   return (
+<<<<<<< HEAD
     <div className="cp-landing">
       {/* =====================================================
           NAVIGATION
@@ -81,6 +87,31 @@ function LandingPage() {
               <ArrowIcon />
             </button>
           </div>
+=======
+    <div className="landing-page">
+      <Seo
+        title="CampusPulse — GPS Attendance & Class Management for OOU"
+        description="GPS-verified attendance, live lecture sessions and department announcements for OOU students and class reps."
+        path="/"
+      />
+      <header className="landing-nav container-wide">
+        <div className="brand">
+          <span className="brand-mark">CP</span>
+          <span>CampusPulse</span>
+        </div>
+        <nav>
+          <a href="#features">Features</a>
+          <a href="#how">How it works</a>
+          <a href="#about">About</a>
+        </nav>
+        <div className="landing-actions">
+          <button className="button ghost" onClick={() => navigate('/login')}>
+            Log in
+          </button>
+          <button className="button primary" onClick={() => navigate('/signup')}>
+            Get started
+          </button>
+>>>>>>> ca72c514c7af5177f6b6393ac54d55922b136504
         </div>
       </header>
 
