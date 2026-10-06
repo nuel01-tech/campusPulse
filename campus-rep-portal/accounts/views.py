@@ -15,6 +15,7 @@ from sib_api_v3_sdk.rest import ApiException
 from attendance.models import ClassCode
 from .models import Department, PushSubscription, User
 from .push import send_push_to_user
+import traceback
 from .serializers import (
     MyTokenObtainPairSerializer, PreferencesSerializer, SignupSerializer,
     UserProfileSerializer, StudentClassmateSerializer, RepClassmateSerializer,
@@ -117,6 +118,52 @@ class SignupView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
+    def create(self, request, *args, **kwargs):
+        try:
+            print("========== SIGNUP DEBUG START ==========")
+            print("SIGNUP DATA:", {
+                "username": request.data.get("username"),
+                "email": request.data.get("email"),
+                "first_name": request.data.get("first_name"),
+                "last_name": request.data.get("last_name"),
+                "department": request.data.get("department"),
+                "level": request.data.get("level"),
+                "terms_accepted": request.data.get("terms_accepted"),
+            })
+
+            serializer = self.get_serializer(data=request.data)
+
+            print("RUNNING SERIALIZER VALIDATION...")
+            serializer.is_valid(raise_exception=True)
+
+            print("VALIDATED DATA:", serializer.validated_data)
+
+            print("CREATING USER...")
+            self.perform_create(serializer)
+
+            print("USER CREATED:", serializer.instance.pk)
+            print("========== SIGNUP DEBUG SUCCESS ==========")
+
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED,
+                headers=headers,
+            )
+
+        except Exception as exc:
+            print("========== SIGNUP CRASH ==========")
+            print("EXCEPTION TYPE:", type(exc).__name__)
+            print("EXCEPTION:", str(exc))
+            traceback.print_exc()
+            print("========== SIGNUP CRASH END ==========")
+
+            return Response(
+                {
+                    "detail": f"Signup crashed: {type(exc).__name__}: {str(exc)}"
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
