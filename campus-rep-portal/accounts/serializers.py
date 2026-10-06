@@ -8,44 +8,47 @@ from .models import User
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     terms_accepted = serializers.BooleanField(write_only=True, required=True)
-    class_code = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
         fields = [
-            'username', 'first_name', 'last_name', 'email', 'password',
-            'department', 'level', 'terms_accepted', 'class_code'
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'password',
+            'department',
+            'level',
+            'terms_accepted',
         ]
 
     def validate(self, attrs):
-        from attendance.models import ClassCode
         department = attrs.get('department')
         level = attrs.get('level')
         email = attrs.get('email')
-        class_code = (attrs.get('class_code') or '').strip().upper()
 
         if not department or not level:
-            raise serializers.ValidationError({'department': 'Department and level are required.'})
+            raise serializers.ValidationError({
+                'department': 'Department and level are required.'
+            })
+
         if not attrs.get('terms_accepted'):
-            raise serializers.ValidationError({'terms_accepted': 'You must accept the Terms & Conditions.'})
+            raise serializers.ValidationError({
+                'terms_accepted': 'You must accept the Terms & Conditions.'
+            })
+
         if email and User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError({'email': 'A user with that email address already exists.'})
+            raise serializers.ValidationError({
+                'email': 'A user with that email address already exists.'
+            })
 
-        expected_code = ClassCode.objects.filter(department=department, level=level).first()
-        if not expected_code or expected_code.code.upper() != class_code:
-            raise serializers.ValidationError({'class_code': 'Invalid class code for the selected department and level.'})
-
-        attrs['class_code'] = class_code
         return attrs
 
     def create(self, validated_data):
         validated_data.pop('terms_accepted', None)
-        validated_data.pop('class_code', None)
         validated_data['terms_accepted_at'] = timezone.now()
-        validated_data['registration_completed'] = True
-        validated_data['class_code_verified'] = True
-        return User.objects.create_user(**validated_data)
 
+        return User.objects.create_user(**validated_data)
 class UserProfileSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     faculty = serializers.CharField(source='department.faculty', read_only=True, allow_null=True)
