@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
@@ -11,7 +12,9 @@ function getRole() {
     if (token) {
       return jwtDecode(token).role || "STUDENT";
     }
-  } catch {}
+  } catch {
+    return "STUDENT";
+  }
 
   return "STUDENT";
 }
@@ -433,7 +436,11 @@ function Classmates() {
   };
 
   useEffect(() => {
-    loadClassmates();
+    const timer = window.setTimeout(() => {
+      loadClassmates();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const handleToggleSuspendConfirm = async () => {
@@ -819,159 +826,175 @@ function Classmates() {
             Suspend / Reactivate modal
         -------------------------------------------- */}
 
-        {suspendModal.open && suspendModal.person && (
-          <div
-            className="cp-directory-modal-backdrop"
-            onClick={() =>
-              !suspendModal.processing &&
-              setSuspendModal({
-                open: false,
-                person: null,
-                processing: false,
-              })
-            }
-          >
+        {suspendModal.open &&
+          suspendModal.person &&
+          createPortal(
             <div
-              className="cp-directory-modal"
-              onClick={(event) => event.stopPropagation()}
+              className="cp-directory-modal-backdrop"
+              onClick={() =>
+                !suspendModal.processing &&
+                setSuspendModal({
+                  open: false,
+                  person: null,
+                  processing: false,
+                })
+              }
             >
-              <div className="cp-modal-icon cp-modal-icon-warning">
-                <Icon name="warning" size={22} />
-              </div>
+              <div
+                className="cp-directory-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cp-suspend-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="cp-modal-icon cp-modal-icon-warning">
+                  <Icon name="warning" size={22} />
+                </div>
 
-              <div className="cp-modal-content">
-                <div className="cp-modal-heading">
-                  <h3>
+                <div className="cp-modal-content">
+                  <div className="cp-modal-heading">
+                    <h3 id="cp-suspend-modal-title">
+                      {suspendModal.person.is_active === false
+                        ? "Reactivate account?"
+                        : "Suspend student account?"}
+                    </h3>
+
+                    <p>
+                      {suspendModal.person.first_name}{" "}
+                      {suspendModal.person.last_name}
+                      {" · "}@{suspendModal.person.username}
+                    </p>
+                  </div>
+
+                  <div className="cp-modal-message">
                     {suspendModal.person.is_active === false
-                      ? "Reactivate account?"
-                      : "Suspend student account?"}
-                  </h3>
+                      ? "Reactivating this account will restore the student’s access to attendance, announcements and class activities."
+                      : "Suspending this account will temporarily block the student from attendance and class portal activities until reactivated."}
+                  </div>
 
-                  <p>
-                    {suspendModal.person.first_name}{" "}
-                    {suspendModal.person.last_name}
-                    {" · "}@{suspendModal.person.username}
-                  </p>
-                </div>
+                  <div className="cp-modal-actions">
+                    <button
+                      type="button"
+                      className="cp-modal-button cp-modal-button-secondary"
+                      disabled={suspendModal.processing}
+                      onClick={() =>
+                        setSuspendModal({
+                          open: false,
+                          person: null,
+                          processing: false,
+                        })
+                      }
+                    >
+                      Cancel
+                    </button>
 
-                <div className="cp-modal-message">
-                  {suspendModal.person.is_active === false
-                    ? "Reactivating this account will restore the student’s access to attendance, announcements and class activities."
-                    : "Suspending this account will temporarily block the student from attendance and class portal activities until reactivated."}
-                </div>
-
-                <div className="cp-modal-actions">
-                  <button
-                    type="button"
-                    className="cp-modal-button cp-modal-button-secondary"
-                    disabled={suspendModal.processing}
-                    onClick={() =>
-                      setSuspendModal({
-                        open: false,
-                        person: null,
-                        processing: false,
-                      })
-                    }
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`cp-modal-button ${
-                      suspendModal.person.is_active === false
-                        ? "cp-modal-button-primary"
-                        : "cp-modal-button-danger"
-                    }`}
-                    disabled={suspendModal.processing}
-                    onClick={handleToggleSuspendConfirm}
-                  >
-                    {suspendModal.processing
-                      ? "Updating..."
-                      : suspendModal.person.is_active === false
-                        ? "Reactivate account"
-                        : "Suspend account"}
-                  </button>
+                    <button
+                      type="button"
+                      className={`cp-modal-button ${
+                        suspendModal.person.is_active === false
+                          ? "cp-modal-button-primary"
+                          : "cp-modal-button-danger"
+                      }`}
+                      disabled={suspendModal.processing}
+                      onClick={handleToggleSuspendConfirm}
+                    >
+                      {suspendModal.processing
+                        ? "Updating..."
+                        : suspendModal.person.is_active === false
+                          ? "Reactivate account"
+                          : "Suspend account"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
 
         {/* -------------------------------------------
             Delete modal
         -------------------------------------------- */}
 
-        {deleteModal.open && deleteModal.person && (
-          <div
-            className="cp-directory-modal-backdrop"
-            onClick={() =>
-              !deleteModal.processing &&
-              setDeleteModal({
-                open: false,
-                person: null,
-                processing: false,
-              })
-            }
-          >
+        {deleteModal.open &&
+          deleteModal.person &&
+          createPortal(
             <div
-              className="cp-directory-modal"
-              onClick={(event) => event.stopPropagation()}
+              className="cp-directory-modal-backdrop"
+              onClick={() =>
+                !deleteModal.processing &&
+                setDeleteModal({
+                  open: false,
+                  person: null,
+                  processing: false,
+                })
+              }
             >
-              <div className="cp-modal-icon cp-modal-icon-danger">
-                <Icon name="trash" size={21} />
+              <div
+                className="cp-directory-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cp-delete-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="cp-modal-icon cp-modal-icon-danger">
+                  <Icon name="trash" size={21} />
+                </div>
+
+                <div className="cp-modal-content">
+                  <div className="cp-modal-heading">
+                    <h3 id="cp-delete-modal-title">
+                      Delete mistaken account?
+                    </h3>
+
+                    <p>
+                      {deleteModal.person.first_name}{" "}
+                      {deleteModal.person.last_name}
+                      {" · "}@{deleteModal.person.username}
+                    </p>
+                  </div>
+
+                  <div className="cp-modal-danger-message">
+                    <strong>Permanent action</strong>
+
+                    <span>
+                      Use this only for duplicate or mistakenly registered
+                      accounts. The account and its associated attendance/profile
+                      data will be permanently deleted.
+                    </span>
+                  </div>
+
+                  <div className="cp-modal-actions">
+                    <button
+                      type="button"
+                      className="cp-modal-button cp-modal-button-secondary"
+                      disabled={deleteModal.processing}
+                      onClick={() =>
+                        setDeleteModal({
+                          open: false,
+                          person: null,
+                          processing: false,
+                        })
+                      }
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      className="cp-modal-button cp-modal-button-danger"
+                      disabled={deleteModal.processing}
+                      onClick={handleDeleteConfirm}
+                    >
+                      {deleteModal.processing
+                        ? "Deleting..."
+                        : "Delete account"}
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              <div className="cp-modal-content">
-                <div className="cp-modal-heading">
-                  <h3>Delete mistaken account?</h3>
-
-                  <p>
-                    {deleteModal.person.first_name}{" "}
-                    {deleteModal.person.last_name}
-                    {" · "}@{deleteModal.person.username}
-                  </p>
-                </div>
-
-                <div className="cp-modal-danger-message">
-                  <strong>Permanent action</strong>
-
-                  <span>
-                    Use this only for duplicate or mistakenly registered
-                    accounts. The account and its associated attendance/profile
-                    data will be permanently deleted.
-                  </span>
-                </div>
-
-                <div className="cp-modal-actions">
-                  <button
-                    type="button"
-                    className="cp-modal-button cp-modal-button-secondary"
-                    disabled={deleteModal.processing}
-                    onClick={() =>
-                      setDeleteModal({
-                        open: false,
-                        person: null,
-                        processing: false,
-                      })
-                    }
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="button"
-                    className="cp-modal-button cp-modal-button-danger"
-                    disabled={deleteModal.processing}
-                    onClick={handleDeleteConfirm}
-                  >
-                    {deleteModal.processing ? "Deleting..." : "Delete account"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
       </div>
     </AppShell>
   );

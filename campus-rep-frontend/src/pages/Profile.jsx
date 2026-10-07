@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import AppShell from "../components/AppShell";
@@ -91,20 +91,19 @@ function Profile() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [pictureSaving, setPictureSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [copiedMatric, setCopiedMatric] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fileRef = useRef(null);
 
-  let role = "STUDENT";
-
-  try {
-    const token = localStorage.getItem("access");
-    role = token ? jwtDecode(token).role : "STUDENT";
-  } catch {
-    role = "STUDENT";
-  }
+  const role = useMemo(() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token).role : "STUDENT";
+    } catch {
+      return "STUDENT";
+    }
+  }, []);
 
   const loadProfile = async () => {
     try {
@@ -130,7 +129,11 @@ function Profile() {
   };
 
   useEffect(() => {
-    loadProfile();
+    const timer = window.setTimeout(() => {
+      loadProfile();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -256,32 +259,6 @@ function Profile() {
       setTimeout(() => setCopiedMatric(false), 2000);
     } catch {
       setError("Unable to copy the matric number.");
-    }
-  };
-
-  const deleteAccount = async () => {
-    if (
-      !window.confirm(
-        "Delete your representative account permanently? This cannot be undone.",
-      )
-    ) {
-      return;
-    }
-
-    setDeleting(true);
-    setError("");
-
-    try {
-      await api.delete("/accounts/profile/");
-
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-
-      window.location.href = "/";
-    } catch (e) {
-      setError(e.response?.data?.detail || "Unable to delete your account.");
-
-      setDeleting(false);
     }
   };
 
@@ -688,24 +665,16 @@ function Profile() {
         {isRep && (
           <section className="cp-profile-danger">
             <div>
-              <span className="cp-profile-danger-eyebrow">Danger zone</span>
+              <span className="cp-profile-danger-eyebrow">Account access</span>
 
-              <h2>Delete representative account</h2>
+              <h2>Need to leave this representative role?</h2>
 
               <p>
-                Permanently remove your course representative account, lecture
-                history and access keys. This action cannot be undone.
+                Accounts are not permanently deleted here because doing so can
+                erase class records. Contact the system owner to deactivate the
+                account safely.
               </p>
             </div>
-
-            <button
-              type="button"
-              className="cp-profile-delete"
-              onClick={deleteAccount}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting account…" : "Delete my account"}
-            </button>
           </section>
         )}
       </div>

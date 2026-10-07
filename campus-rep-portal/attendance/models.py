@@ -8,7 +8,7 @@ from accounts.models import Department
 from cloudinary_storage.storage import RawMediaCloudinaryStorage
 
 class LectureSession(models.Model):
-    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
     level = models.CharField(max_length=3, choices=[
         ('100', '100 Level'),
         ('200', '200 Level'),
@@ -38,7 +38,7 @@ class Announcement(models.Model):
         ('ASSIGNMENT', 'Assignment'),
         ('VENUE_CHANGE', 'Venue Change'),
     )
-    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
     level = models.CharField(max_length=3, choices=[
         ('100', '100 Level'), ('200', '200 Level'), ('300', '300 Level'),
         ('400', '400 Level'), ('500', '500 Level'),
@@ -73,7 +73,7 @@ def generate_class_code():
 
 
 class ClassCode(models.Model):
-    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
     level = models.CharField(max_length=3, choices=[
         ('100', '100 Level'), ('200', '200 Level'), ('300', '300 Level'),
         ('400', '400 Level'), ('500', '500 Level'),
@@ -106,7 +106,7 @@ class CampusDocument(models.Model):
     title = models.CharField(max_length=180)
     description = models.TextField(blank=True)
     course_code = models.CharField(max_length=20, blank=True)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
     level = models.CharField(max_length=3, choices=[
         ('100', '100 Level'), ('200', '200 Level'), ('300', '300 Level'),
         ('400', '400 Level'), ('500', '500 Level'),

@@ -434,7 +434,7 @@ class CampusDocumentListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = CampusDocument.objects.select_related('department', 'uploaded_by')
-        if user.role != 'SUPER_ADMIN':
+        if not user.is_superuser and user.role != 'SUPER_ADMIN':
             if not user.department:
                 return queryset.none()
             # Keep academic documents inside the user's department and level.
@@ -473,7 +473,7 @@ class CampusDocumentDownloadView(APIView):
         except CampusDocument.DoesNotExist:
             return Response({'detail': 'Document not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if request.user.role != 'SUPER_ADMIN' and (
+        if not request.user.is_superuser and request.user.role != 'SUPER_ADMIN' and (
             document.department_id != getattr(request.user.department, 'id', None)
             or document.level != request.user.level
         ):

@@ -21,6 +21,7 @@ import Preferences from "./pages/Preferences";
 import Notifications from "./pages/Notifications";
 import Documents from "./pages/Documents";
 import Classmates from "./pages/Classmates";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -76,6 +77,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute allowedRole="SUPER_ADMIN">
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />

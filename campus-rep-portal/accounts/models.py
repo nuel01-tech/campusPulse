@@ -25,7 +25,7 @@ class User(AbstractUser):
         ('500', '500 Level'),
     )
     role = models.CharField(max_length=20, choices=ROLES, default='STUDENT')
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
     enable_wakeup_calls = models.BooleanField(default=False)
     push_notifications = models.BooleanField(default=True)
@@ -164,3 +164,24 @@ class AttendancePasskeyGrant(models.Model):
 
     def __str__(self):
         return f"Attendance passkey grant for {self.user.username}"
+
+
+class AdminAuditEvent(models.Model):
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admin_audit_events",
+    )
+    action = models.CharField(max_length=40)
+    target_type = models.CharField(max_length=40)
+    target_id = models.CharField(max_length=64, blank=True)
+    summary = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.action}: {self.summary}"

@@ -125,6 +125,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        token['role'] = user.role
+        token['role'] = 'SUPER_ADMIN' if user.is_superuser else user.role
         token['username'] = user.username
         return token

@@ -47,7 +47,13 @@ function Login() {
 
       const d = jwtDecode(r.data.access);
 
-      navigate(d.role === "CLASS_REP" ? "/rep" : "/student");
+      navigate(
+        d.role === "SUPER_ADMIN"
+          ? "/admin"
+          : d.role === "CLASS_REP"
+            ? "/rep"
+            : "/student",
+      );
     } catch {
       setError("Invalid username or password. Please check your credentials.");
     } finally {

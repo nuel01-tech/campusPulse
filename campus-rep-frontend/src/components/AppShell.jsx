@@ -132,6 +132,7 @@ function AppShell({ role = "STUDENT", children }) {
   }, []);
 
   const isRep = role === "CLASS_REP";
+  const isAdmin = role === "SUPER_ADMIN";
   const registrationProgress = profile
     ? Math.round(
         ((Boolean(profile.matric_number) +
@@ -146,7 +147,27 @@ function AppShell({ role = "STUDENT", children }) {
    * Navigation is intentionally grouped.
    * The routes themselves remain unchanged.
    */
-  const navigation = isRep
+  const navigation = isAdmin
+    ? {
+        overview: [
+          ["/admin", "Overview", "grid"],
+          ["/admin/users", "Users", "users"],
+        ],
+        community: [
+          ["/admin/departments", "Departments", "users"],
+          ["/admin/classes", "Class codes", "calendar"],
+          ["/admin/sessions", "Sessions", "clock"],
+          ["/admin/announcements", "Announcements", "megaphone"],
+          ["/admin/documents", "Documents", "file"],
+          ["/admin/audit", "Audit history", "clock"],
+        ],
+        account: [
+          ["/profile", "Profile", "user"],
+          ["/security", "Security", "settings"],
+          ["/preferences", "Preferences", "settings"],
+        ],
+      }
+    : isRep
     ? {
         overview: [
           ["/rep", "Dashboard", "grid"],
@@ -184,7 +205,15 @@ function AppShell({ role = "STUDENT", children }) {
         ],
       };
 
-  const bottomLinks = isRep
+  const bottomLinks = isAdmin
+    ? [
+        ["/admin", "Overview", "grid"],
+        ["/admin/users", "Users", "users"],
+        ["/admin/departments", "Departments", "calendar"],
+        ["/admin/audit", "Audit", "clock"],
+        ["/profile", "Profile", "user"],
+      ]
+    : isRep
     ? [
         ["/rep", "Home", "grid"],
         ["/rep/sessions", "Sessions", "calendar"],
@@ -265,7 +294,7 @@ function AppShell({ role = "STUDENT", children }) {
           <NavLink
             key={to}
             to={to}
-            end={to === "/student" || to === "/rep"}
+            end={to === "/student" || to === "/rep" || to === "/admin"}
             onClick={closeMobileMenu}
             className={({ isActive }) =>
               `cp-nav-link ${isActive ? "active" : ""}`
@@ -321,7 +350,13 @@ function AppShell({ role = "STUDENT", children }) {
           <div>
             <span className="cp-workspace-label">Workspace</span>
 
-            <strong>{isRep ? "Class Representative" : "Student Portal"}</strong>
+            <strong>
+              {isAdmin
+                ? "Owner administration"
+                : isRep
+                  ? "Class Representative"
+                  : "Student Portal"}
+            </strong>
           </div>
         </div>
 
@@ -344,7 +379,13 @@ function AppShell({ role = "STUDENT", children }) {
 
             <span className="cp-user-info">
               <strong>{username}</strong>
-              <small>{isRep ? "Class Representative" : "Student"}</small>
+              <small>
+                {isAdmin
+                  ? "Administrator"
+                  : isRep
+                    ? "Class Representative"
+                    : "Student"}
+              </small>
             </span>
 
             <span className="cp-user-arrow">›</span>
@@ -378,7 +419,11 @@ function AppShell({ role = "STUDENT", children }) {
                 <span>Olabisi Onabanjo University</span>
 
                 <strong>
-                  {isRep ? "Representative workspace" : "Student workspace"}
+                  {isAdmin
+                    ? "Owner administration"
+                    : isRep
+                      ? "Representative workspace"
+                      : "Student workspace"}
                 </strong>
               </div>
             </div>
@@ -411,7 +456,9 @@ function AppShell({ role = "STUDENT", children }) {
 
               <span className="cp-topbar-user">
                 <strong>{username}</strong>
-                <small>{isRep ? "Class Rep" : "Student"}</small>
+                <small>
+                  {isAdmin ? "Administrator" : isRep ? "Class Rep" : "Student"}
+                </small>
               </span>
 
               <span className="cp-profile-chevron">↓</span>
@@ -463,7 +510,7 @@ function AppShell({ role = "STUDENT", children }) {
           <NavLink
             key={to}
             to={to}
-            end={to === "/student" || to === "/rep"}
+            end={to === "/student" || to === "/rep" || to === "/admin"}
             className={({ isActive }) =>
               `cp-bottom-item ${isActive ? "active" : ""}`
             }
@@ -486,5 +533,4 @@ function AppShell({ role = "STUDENT", children }) {
   );
 }
 
-export { icons };
 export default AppShell;

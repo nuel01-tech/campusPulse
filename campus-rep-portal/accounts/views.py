@@ -73,6 +73,17 @@ class MyProfileView(generics.RetrieveUpdateDestroyAPIView):
     def get_object(self):
         return self.request.user
 
+    def destroy(self, request, *args, **kwargs):
+        return Response(
+            {
+                'detail': (
+                    'Permanent account deletion is disabled to preserve class '
+                    'records. Ask the system owner to deactivate your account.'
+                )
+            },
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
     def update(self, request, *args, **kwargs):
         # Usernames are account identifiers in CampusPulse and cannot be changed.
         if 'username' in request.data and request.data.get('username') != request.user.username:

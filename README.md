@@ -18,6 +18,11 @@ A campus attendance and department-communication platform built for OOU class re
 - Class rep audit log
 - Class code system to restrict signups to verified students
 - Push notifications when a session goes live
+- Owner workspace for account, department, class-code, session, announcement, document, and audit management
+
+## Owner Workspace
+
+Sign in to the frontend with a Django superuser account to open the owner dashboard at `/admin`. Account access can be deactivated and restored without deleting the account. Department names can be edited without breaking their existing class links, and departments with linked records cannot be deleted. Class codes are scoped to a department and level.
 
 ## Setup
 
