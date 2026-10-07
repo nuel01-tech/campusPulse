@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Count, Q
+import logging
 from django.utils.dateparse import parse_date
 from rest_framework import permissions, status
 from rest_framework.pagination import PageNumberPagination
@@ -12,10 +13,13 @@ from attendance.models import (
     CampusDocument,
     ClassCode,
     LectureSession,
+    Notification,
 )
+from accounts.push import send_email_to_user, send_push_to_user
 from .models import AdminAuditEvent, Department, User
 
 
+logger = logging.getLogger(__name__)
 LEVELS = {value for value, _label in User.LEVELS}
 
 
@@ -511,6 +515,115 @@ class AdminAnnouncementListView(APIView):
             "department", "posted_by"
         ).order_by("-created_at")
         return Response([announcement_data(item) for item in announcements])
+
+    def post(self, request):
+        title = str(request.data.get("title") or "").strip()
+        body = str(request.data.get("body") or "").strip()
+        category = str(request.data.get("category") or "GENERAL").strip().upper()
+        department = find_department(request.data.get("department"))
+        level = str(request.data.get("level") or "").strip()
+        due_date_value = request.data.get("due_date")
+        due_date = None
+
+        if not title or not body:
+            return Response(
+                {"detail": "Announcement title and message are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(title) > 150:
+            return Response({"title": "Title must be 150 characters or fewer."}, status=status.HTTP_400_BAD_REQUEST)
+        if not department:
+            return Response(
+                {"department": "Choose an existing department."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if level not in LEVELS:
+            return Response(
+                {"level": "Choose a valid class level."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        allowed_categories = {value for value, _label in Announcement.CATEGORY_CHOICES}
+        if category not in allowed_categories:
+            return Response(
+                {"category": "Choose a valid announcement category."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if due_date_value:
+            if not isinstance(due_date_value, str):
+                return Response({"due_date": "Enter a valid date."}, status=status.HTTP_400_BAD_REQUEST)
+            due_date = parse_date(due_date_value)
+            if not due_date:
+                return Response({"due_date": "Enter a valid date."}, status=status.HTTP_400_BAD_REQUEST)
+        if category != "ASSIGNMENT":
+            due_date = None
+
+        with transaction.atomic():
+            announcement = Announcement.objects.create(
+                department=department,
+                level=level,
+                category=category,
+                title=title,
+                body=body,
+                due_date=due_date,
+                posted_by=request.user,
+            )
+            students = User.objects.filter(
+                department=department,
+                level=level,
+                role="STUDENT",
+                is_active=True,
+            )
+            recipient_count = students.count()
+            log_admin_action(
+                request,
+                "ANNOUNCEMENT_SENT",
+                "Announcement",
+                announcement.pk,
+                f"Sent {category.lower()} announcement '{title}' to {department.name}, {level} level ({recipient_count} students).",
+            )
+
+        external_delivery_errors = 0
+        for student in students.iterator():
+            Notification.objects.create(
+                user=student,
+                type="ANNOUNCEMENT",
+                title=title,
+                body=body,
+            )
+            if not student.announcement_notifications:
+                continue
+            try:
+                send_push_to_user(student, title, body[:180])
+            except Exception:
+                external_delivery_errors += 1
+                logger.exception(
+                    "Admin announcement push delivery failed for user %s",
+                    student.pk,
+                )
+            try:
+                send_email_to_user(student, title, body)
+            except Exception:
+                external_delivery_errors += 1
+                logger.exception(
+                    "Admin announcement email delivery failed for user %s",
+                    student.pk,
+                )
+
+        detail = f"Announcement sent to {recipient_count} students."
+        if external_delivery_errors:
+            detail += (
+                f" In-app notifications were saved, but {external_delivery_errors} "
+                "email or push deliveries failed."
+            )
+        return Response(
+            {
+                "detail": detail,
+                "announcement": announcement_data(announcement),
+                "recipient_count": recipient_count,
+                "external_delivery_errors": external_delivery_errors,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class AdminAnnouncementDetailView(APIView):

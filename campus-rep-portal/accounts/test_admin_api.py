@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -11,6 +12,7 @@ from attendance.models import (
     CampusDocument,
     ClassCode,
     LectureSession,
+    Notification,
 )
 from .models import AdminAuditEvent, Department
 from .serializers import MyTokenObtainPairSerializer
@@ -227,6 +229,89 @@ class OwnerAdminApiTests(TestCase):
         )
         self.assertEqual(deleted.status_code, 200)
         self.assertFalse(Announcement.objects.filter(pk=announcement.pk).exists())
+
+    @patch("accounts.admin_api.send_push_to_user")
+    @patch("accounts.admin_api.send_email_to_user")
+    def test_owner_can_send_general_announcement_to_selected_class(
+        self,
+        send_email,
+        send_push,
+    ):
+        other_department = Department.objects.create(
+            name="Sociology",
+            faculty="Social Science",
+        )
+        other_class_student = User.objects.create_user(
+            username="other_class_student",
+            email="other@example.com",
+            password="StrongPass123",
+            department=other_department,
+            level="200",
+        )
+
+        response = self.client.post(
+            "/api/accounts/admin/announcements/",
+            {
+                "title": "Class update",
+                "body": "Please read this update.",
+                "category": "GENERAL",
+                "department": self.department.pk,
+                "level": "200",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["recipient_count"], 1)
+        self.assertEqual(
+            Notification.objects.filter(
+                user=self.student,
+                type="ANNOUNCEMENT",
+            ).count(),
+            1,
+        )
+        self.assertFalse(
+            Notification.objects.filter(
+                user=other_class_student,
+                type="ANNOUNCEMENT",
+            ).exists()
+        )
+        send_push.assert_called_once()
+        send_email.assert_called_once()
+        self.assertTrue(
+            AdminAuditEvent.objects.filter(action="ANNOUNCEMENT_SENT").exists()
+        )
+
+    @patch("cloudinary_storage.storage.RawMediaCloudinaryStorage.save")
+    def test_owner_can_upload_document_to_selected_department_and_level(
+        self,
+        save_file,
+    ):
+        save_file.return_value = "campus_documents/class-notes.pdf"
+        uploaded_file = SimpleUploadedFile(
+            "class-notes.pdf",
+            b"%PDF-1.4 test document",
+            content_type="application/pdf",
+        )
+
+        response = self.client.post(
+            "/api/attendance/documents/",
+            {
+                "title": "Class notes",
+                "description": "Shared notes.",
+                "course_code": "CSC201",
+                "department": str(self.department.pk),
+                "level": "200",
+                "file": uploaded_file,
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        document = CampusDocument.objects.get(title="Class notes")
+        self.assertEqual(document.department, self.department)
+        self.assertEqual(document.level, "200")
+        self.assertEqual(document.uploaded_by, self.owner)
 
     def test_owner_can_view_documents_across_classes(self):
         CampusDocument.objects.create(

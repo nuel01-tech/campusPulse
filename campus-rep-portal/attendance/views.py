@@ -451,16 +451,24 @@ class CampusDocumentListCreateView(generics.ListCreateAPIView):
         return queryset
 
     def perform_create(self, serializer):
-        if self.request.user.role not in {'STUDENT', 'CLASS_REP'}:
+        user = self.request.user
+        if user.is_superuser:
+            department = serializer.validated_data.get('department')
+            if not department:
+                raise ValidationError({'department': 'Choose the department for this document.'})
+            serializer.save(department=department, uploaded_by=user)
+            return
+
+        if user.role not in {'STUDENT', 'CLASS_REP'}:
             raise ValidationError('Only students and class representatives can upload documents.')
-        if not self.request.user.department or not self.request.user.level:
+        if not user.department or not user.level:
             raise ValidationError('Complete your department and level before uploading a document.')
         level = serializer.validated_data.get('level')
-        if level != self.request.user.level:
+        if level != user.level:
             raise ValidationError({'level': 'You can only upload documents for your current level.'})
         serializer.save(
-            department=self.request.user.department,
-            uploaded_by=self.request.user,
+            department=user.department,
+            uploaded_by=user,
         )
 
 

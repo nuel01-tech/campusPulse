@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from accounts.models import Department
 from .models import LectureSession, Announcement, CampusDocument
 
 
@@ -50,9 +51,14 @@ class CampusDocumentSerializer(serializers.ModelSerializer):
 
 
 class CampusDocumentUploadSerializer(serializers.ModelSerializer):
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        required=False,
+    )
+
     class Meta:
         model = CampusDocument
-        fields = ['title', 'description', 'course_code', 'level', 'file']
+        fields = ['title', 'description', 'course_code', 'department', 'level', 'file']
 
     def validate_file(self, value):
         if value.size > 10 * 1024 * 1024:

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
@@ -44,6 +44,25 @@ function AdminDashboard() {
   const [newDepartment, setNewDepartment] = useState({ name: "", faculty: "" });
   const [newCode, setNewCode] = useState({ department: "", level: "100" });
   const [announcementDrafts, setAnnouncementDrafts] = useState({});
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: "",
+    body: "",
+    department: "",
+    level: "100",
+    category: "GENERAL",
+    due_date: "",
+  });
+  const [documentForm, setDocumentForm] = useState({
+    title: "",
+    description: "",
+    course_code: "",
+    department: "",
+    level: "100",
+  });
+  const [documentFile, setDocumentFile] = useState(null);
+  const [publishingAnnouncement, setPublishingAnnouncement] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const documentInputRef = useRef(null);
 
   const title = useMemo(
     () =>
@@ -389,6 +408,82 @@ function AdminDashboard() {
     }
   };
 
+  const publishAnnouncement = async (event) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setPublishingAnnouncement(true);
+    try {
+      const response = await api.post("/accounts/admin/announcements/", {
+        ...announcementForm,
+        title: announcementForm.title.trim(),
+        body: announcementForm.body.trim(),
+        due_date: announcementForm.category === "ASSIGNMENT"
+          ? announcementForm.due_date || null
+          : null,
+      });
+      setAnnouncements((current) => [
+        response.data.announcement,
+        ...current.filter((item) => item.id !== response.data.announcement.id),
+      ]);
+      setAnnouncementForm((current) => ({
+        ...current,
+        title: "",
+        body: "",
+        due_date: "",
+      }));
+      setNotice(response.data.detail);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to send this announcement."));
+    } finally {
+      setPublishingAnnouncement(false);
+    }
+  };
+
+  const uploadDocument = async (event) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    if (!documentFile) {
+      setError("Choose a PDF file to upload.");
+      return;
+    }
+    if (documentFile.size > 10 * 1024 * 1024) {
+      setError("PDF must be 10 MB or smaller.");
+      return;
+    }
+
+    setUploadingDocument(true);
+    try {
+      const data = new FormData();
+      data.append("title", documentForm.title.trim());
+      data.append("description", documentForm.description.trim());
+      data.append("course_code", documentForm.course_code.trim().toUpperCase());
+      data.append("department", documentForm.department);
+      data.append("level", documentForm.level);
+      data.append("file", documentFile);
+      await api.post("/attendance/documents/", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const response = await api.get("/accounts/admin/documents/");
+      setDocuments(response.data);
+      setDocumentForm((current) => ({
+        ...current,
+        title: "",
+        description: "",
+        course_code: "",
+      }));
+      setDocumentFile(null);
+      if (documentInputRef.current) documentInputRef.current.value = "";
+      setNotice("Document uploaded and shared with the selected class.");
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to upload this document."));
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
   const downloadDocument = async (documentRecord) => {
     setError("");
     try {
@@ -593,8 +688,28 @@ function AdminDashboard() {
   );
 
   const renderAnnouncements = () => (
-    <section className="cp-owner-panel">
-      <div className="cp-owner-panel-heading"><div><span className="cp-owner-eyebrow">Class communications</span><h2>{announcements.length} announcements</h2></div></div>
+    <>
+      <section className="cp-owner-panel">
+        <div className="cp-owner-panel-heading">
+          <div><span className="cp-owner-eyebrow">Class communications</span><h2>Send an announcement</h2></div>
+        </div>
+        <form className="cp-owner-compose-form" onSubmit={publishAnnouncement}>
+          <div className="cp-owner-form-row">
+            <label><span>Title</span><input required maxLength="150" value={announcementForm.title} onChange={(event) => setAnnouncementForm({ ...announcementForm, title: event.target.value })} /></label>
+            <label><span>Category</span><select value={announcementForm.category} onChange={(event) => setAnnouncementForm({ ...announcementForm, category: event.target.value, due_date: "" })}><option value="GENERAL">General</option><option value="ASSIGNMENT">Assignment</option><option value="VENUE_CHANGE">Venue change</option></select></label>
+          </div>
+          <label><span>Message</span><textarea required rows="4" value={announcementForm.body} onChange={(event) => setAnnouncementForm({ ...announcementForm, body: event.target.value })} /></label>
+          <div className="cp-owner-form-row">
+            <label><span>Department</span><select required value={announcementForm.department} onChange={(event) => setAnnouncementForm({ ...announcementForm, department: event.target.value })}><option value="">Select department</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+            <label><span>Level</span><select value={announcementForm.level} onChange={(event) => setAnnouncementForm({ ...announcementForm, level: event.target.value })}>{LEVELS.map((level) => <option key={level} value={level}>{level} Level</option>)}</select></label>
+            {announcementForm.category === "ASSIGNMENT" && <label><span>Due date</span><input type="date" value={announcementForm.due_date} onChange={(event) => setAnnouncementForm({ ...announcementForm, due_date: event.target.value })} /> </label>}
+          </div>
+          <p className="cp-owner-muted">This announcement goes to active students in the selected department and level.</p>
+          <button type="submit" className="cp-owner-button" disabled={publishingAnnouncement}>{publishingAnnouncement ? "Sending…" : "Send announcement"}</button>
+        </form>
+      </section>
+      <section className="cp-owner-panel">
+      <div className="cp-owner-panel-heading"><div><span className="cp-owner-eyebrow">Previously posted</span><h2>{announcements.length} announcements</h2></div></div>
       <div className="cp-owner-edit-list">
         {announcements.map((announcement) => {
           const draft = announcementDrafts[announcement.id] || announcement;
@@ -614,10 +729,29 @@ function AdminDashboard() {
         })}
         {announcements.length === 0 && <p className="cp-owner-muted">No announcements.</p>}
       </div>
-    </section>
+      </section>
+    </>
   );
 
   const renderDocuments = () => (
+    <>
+    <section className="cp-owner-panel">
+      <div className="cp-owner-panel-heading"><div><span className="cp-owner-eyebrow">Class materials</span><h2>Upload a document</h2></div></div>
+      <form className="cp-owner-compose-form" onSubmit={uploadDocument}>
+        <div className="cp-owner-form-row">
+          <label><span>Document title</span><input required maxLength="180" value={documentForm.title} onChange={(event) => setDocumentForm({ ...documentForm, title: event.target.value })} /></label>
+          <label><span>Course code (optional)</span><input maxLength="20" value={documentForm.course_code} onChange={(event) => setDocumentForm({ ...documentForm, course_code: event.target.value })} /></label>
+        </div>
+        <label><span>Description (optional)</span><textarea rows="3" value={documentForm.description} onChange={(event) => setDocumentForm({ ...documentForm, description: event.target.value })} /></label>
+        <div className="cp-owner-form-row">
+          <label><span>Department</span><select required value={documentForm.department} onChange={(event) => setDocumentForm({ ...documentForm, department: event.target.value })}><option value="">Select department</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+          <label><span>Level</span><select value={documentForm.level} onChange={(event) => setDocumentForm({ ...documentForm, level: event.target.value })}>{LEVELS.map((level) => <option key={level} value={level}>{level} Level</option>)}</select></label>
+          <label><span>PDF file (max 10 MB)</span><input ref={documentInputRef} type="file" accept="application/pdf,.pdf" required onChange={(event) => setDocumentFile(event.target.files?.[0] || null)} /></label>
+        </div>
+        <p className="cp-owner-muted">The PDF will be available to students in the selected department and level.</p>
+        <button type="submit" className="cp-owner-button" disabled={uploadingDocument}>{uploadingDocument ? "Uploading…" : "Upload and share PDF"}</button>
+      </form>
+    </section>
     <section className="cp-owner-panel">
       <div className="cp-owner-panel-heading"><div><span className="cp-owner-eyebrow">Shared materials</span><h2>{documents.length} documents</h2></div></div>
       <div className="cp-owner-table-wrap"><table className="cp-owner-table"><thead><tr><th>Document</th><th>Course</th><th>Class</th><th>Uploaded by</th><th>Created</th><th>Action</th></tr></thead><tbody>
@@ -625,6 +759,7 @@ function AdminDashboard() {
         {documents.length === 0 && <tr><td colSpan="6">No documents.</td></tr>}
       </tbody></table></div>
     </section>
+    </>
   );
 
   const renderAudit = () => (
