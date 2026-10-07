@@ -34,6 +34,7 @@ from webauthn import (
     generate_registration_options,
     verify_registration_response,
     generate_authentication_options,
+    verify_authentication_response,
     options_to_json,
 )
 
@@ -546,10 +547,11 @@ class PasskeyRegistrationVerifyView(APIView):
         allowed_origins = get_allowed_webauthn_origins(request)
         rp_id = get_webauthn_rp_id(request)
 
+        stored_challenge_bytes = bytes(challenge.challenge)
         try:
             verification = verify_registration_response(
                 credential=credential,
-                expected_challenge=challenge.challenge,
+                expected_challenge=stored_challenge_bytes,
                 expected_origin=allowed_origins,
                 expected_rp_id=rp_id,
                 require_user_verification=False,
@@ -736,10 +738,11 @@ class PasskeyAuthenticationVerifyView(APIView):
         allowed_origins = get_allowed_webauthn_origins(request)
         rp_id = get_webauthn_rp_id(request)
 
+        auth_challenge_bytes = bytes(challenge.challenge)
         try:
             verification = verify_authentication_response(
                 credential=credential,
-                expected_challenge=challenge.challenge,
+                expected_challenge=auth_challenge_bytes,
                 expected_origin=allowed_origins,
                 expected_rp_id=rp_id,
                 credential_public_key=bytes(passkey.public_key),
