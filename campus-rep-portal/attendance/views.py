@@ -43,53 +43,53 @@ class CheckInView(APIView):
                 {"detail": "Complete registration with your matric number, WhatsApp number, and class representative code before checking in."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        # Students must prove their identity with a passkey
-# before they are allowed to mark attendance.
+        attendance_grant = None
+        # Students must prove their identity with a passkey before marking attendance.
         if request.user.role == 'STUDENT':
             attendance_grant_token = request.data.get("attendance_grant")
 
-        if not attendance_grant_token:
-            return Response(
-            {
-                "detail": (
-                    "Passkey verification is required "
-                    "before marking attendance."
+            if not attendance_grant_token:
+                return Response(
+                    {
+                        "detail": (
+                            "Passkey verification is required "
+                            "before marking attendance."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            },
-            status=status.HTTP_403_FORBIDDEN,
-        )
 
-        try:
-            attendance_grant = AttendancePasskeyGrant.objects.get(
-    token=attendance_grant_token,
-    user=request.user,
-    session_id=pk,
-    used=False,
-)
-        except AttendancePasskeyGrant.DoesNotExist:
-            return Response(
-                {
-                    "detail": (
-                        "Invalid attendance authorization. "
-                        "Please verify your passkey again."
-                    )
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            try:
+                attendance_grant = AttendancePasskeyGrant.objects.get(
+                    token=attendance_grant_token,
+                    user=request.user,
+                    session_id=pk,
+                    used=False,
+                )
+            except (AttendancePasskeyGrant.DoesNotExist, ValueError):
+                return Response(
+                    {
+                        "detail": (
+                            "Invalid attendance authorization. "
+                            "Please verify your passkey again."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
-        if attendance_grant.expires_at < timezone.now():
-            attendance_grant.used = True
-            attendance_grant.save(update_fields=["used"])
+            if attendance_grant.expires_at < timezone.now():
+                attendance_grant.used = True
+                attendance_grant.save(update_fields=["used"])
 
-            return Response(
-                {
-                    "detail": (
-                        "Your attendance authorization has expired. "
-                        "Please verify your passkey again."
-                    )
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+                return Response(
+                    {
+                        "detail": (
+                            "Your attendance authorization has expired. "
+                            "Please verify your passkey again."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         try:
             session = LectureSession.objects.get(pk=pk, is_active=True)
@@ -119,8 +119,8 @@ class CheckInView(APIView):
             return Response({"detail": "Already checked in."}, status=status.HTTP_400_BAD_REQUEST)
 
         # The attendance was successfully created.
-# The passkey grant can now be consumed.
-        if request.user.role == 'STUDENT':
+        # The passkey grant can now be consumed.
+        if attendance_grant:
             attendance_grant.used = True
             attendance_grant.save(update_fields=["used"])
 

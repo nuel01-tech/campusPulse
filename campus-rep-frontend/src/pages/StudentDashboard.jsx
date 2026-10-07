@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import { authenticatePasskeyForSession } from "../utils/passkey";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -217,19 +218,26 @@ function StudentDashboard() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          setMessage("Verifying your passkey on this device...");
+          const attendanceGrant = await authenticatePasskeyForSession(id);
+
+          setMessage("Submitting attendance check-in...");
           const response = await api.post(
             `/attendance/sessions/${id}/checkin/`,
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
+              attendance_grant: attendanceGrant,
             },
           );
 
           setMessage(response.data.detail || "Successfully checked in!");
           await loadData();
         } catch (e) {
+          setMessage("");
           setError(
             e.response?.data?.detail ||
+              e.message ||
               "Check-in failed. Please make sure you are inside the lecture room.",
           );
         } finally {
