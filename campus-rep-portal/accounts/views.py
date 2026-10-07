@@ -436,6 +436,10 @@ def get_allowed_webauthn_origins(request=None):
 
 
 def get_webauthn_rp_id(request=None):
+    configured_rp_id = getattr(settings, "WEBAUTHN_RP_ID", None)
+    if configured_rp_id:
+        return configured_rp_id.rstrip(".").lower()
+
     if request:
         req_origin = request.headers.get("Origin")
         if req_origin:

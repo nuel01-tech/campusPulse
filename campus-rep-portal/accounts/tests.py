@@ -3,12 +3,13 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from accounts.models import Department, PasskeyChallenge, PasskeyCredential
 from accounts.serializers import SignupSerializer
+from accounts.views import get_webauthn_rp_id
 from attendance.models import ClassCode
 
 User = get_user_model()
@@ -179,6 +180,14 @@ class ClassmatesAndManagementTests(TestCase):
 
 
 class PasskeyAuthenticationTests(TestCase):
+    @override_settings(WEBAUTHN_RP_ID='campusoou.netlify.app')
+    def test_configured_rp_id_is_used_for_netlify_deploy_preview(self):
+        request = SimpleNamespace(headers={
+            'Origin': 'https://deploy-preview-1--campusoou.netlify.app',
+        })
+
+        self.assertEqual(get_webauthn_rp_id(request), 'campusoou.netlify.app')
+
     def test_authentication_verification_calls_webauthn_verifier(self):
         self.client = APIClient()
         user = User.objects.create_user(

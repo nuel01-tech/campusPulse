@@ -204,7 +204,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 WEBAUTHN_RP_ID = os.getenv(
     "WEBAUTHN_RP_ID",
-    "localhost",
+    "localhost" if DEBUG else "campusoou.netlify.app",
 )
 
 WEBAUTHN_RP_NAME = os.getenv(
