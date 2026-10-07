@@ -522,16 +522,13 @@ class PasskeyRegistrationVerifyView(APIView):
                 require_user_verification=True,
             )
 
-        except WebAuthnException:
+        except WebAuthnException as e:
             return Response(
-                {
-                    "detail": (
-                        "Device verification failed. "
-                        "Please try again."
-                    )
-                },
-                status=400,
-            )
+        {
+            "detail": f"Device verification failed: {str(e)}",
+        },
+        status=400,
+    )
 
         # The challenge is now permanently consumed.
         challenge.used = True
