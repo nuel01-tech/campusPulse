@@ -523,9 +523,9 @@ class PasskeyRegistrationVerifyView(APIView):
             )
 
         except WebAuthnException as e:
-    print("PASSKEY VERIFY ERROR:", repr(e), flush=True)
+            print("PASSKEY VERIFY ERROR:", repr(e), flush=True)
 
-    return Response(
+            return Response(
         {
             "detail": f"Device verification failed: {str(e)}",
         },
