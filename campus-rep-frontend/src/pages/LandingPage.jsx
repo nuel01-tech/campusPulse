@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 import Seo from "../components/Seo";
 
 function ArrowIcon() {
@@ -40,6 +41,25 @@ function CheckIcon() {
 function LandingPage() {
   const navigate = useNavigate();
 
+  const openAdmin = () => {
+    try {
+      const token = localStorage.getItem("access");
+      const decoded = token ? jwtDecode(token) : null;
+      if (
+        decoded?.role === "SUPER_ADMIN" &&
+        decoded.exp * 1000 > Date.now()
+      ) {
+        navigate("/admin");
+        return;
+      }
+    } catch {
+      navigate("/login");
+      return;
+    }
+
+    navigate("/login");
+  };
+
   return (
     <div className="cp-landing">
       <Seo
@@ -69,6 +89,15 @@ function LandingPage() {
           </nav>
 
           <div className="cp-landing-nav-actions">
+            <button
+              type="button"
+              className="cp-landing-login"
+              onClick={openAdmin}
+              aria-label="Open owner admin dashboard"
+            >
+              Admin
+            </button>
+
             <button
               type="button"
               className="cp-landing-login"
