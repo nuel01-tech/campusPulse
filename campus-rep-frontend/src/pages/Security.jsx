@@ -1,10 +1,9 @@
-
-import { useState } from "react";
-import { startRegistration } from "@simplewebauthn/browser";
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import AppShell from "../components/AppShell";
 import api from "../api/axios";
+import { registerPasskey, fetchPasskeyStatus, removePasskey } from "../utils/passkey";
 
 function UserIcon() {
   return (
@@ -62,6 +61,18 @@ function Security() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeyMessage, setPasskeyMessage] = useState("");
   const [passkeyError, setPasskeyError] = useState("");
+  const [passkeyStatus, setPasskeyStatus] = useState({ has_passkey: false, passkeys: [] });
+
+  const loadPasskeyStatus = async () => {
+    try {
+      const data = await fetchPasskeyStatus();
+      setPasskeyStatus(data);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadPasskeyStatus();
+  }, []);
 
   let role = "STUDENT";
 
@@ -122,38 +133,40 @@ function Security() {
     setPasskeyError("");
 
     try {
-      // Ask Django for a WebAuthn registration challenge.
-      const optionsResponse = await api.post(
-  "/accounts/passkeys/register/options/",
-);
-
-console.log("PASSKEY BACKEND RESPONSE:", optionsResponse.data);
-console.log("PASSKEY OPTIONS:", optionsResponse.data.options);
-
-const options = JSON.parse(optionsResponse.data.options);
-
-      // Ask the device to create the passkey.
-      const registrationResponse = await startRegistration({
-        optionsJSON: options,
-      });
-
-      // Send the completed passkey back to Django.
-      await api.post("/accounts/passkeys/register/verify/", {
-        credential: registrationResponse,
-        device_name: "My device",
-        challenge_id: optionsResponse.data.challenge_id,
-      });
-
+      await registerPasskey("My device");
       setPasskeyMessage(
-        "Passkey registered successfully. You can now mark attendance securely.",
+        "Passkey registered successfully! You can now mark attendance securely.",
       );
+      await loadPasskeyStatus();
     } catch (err) {
       console.error("Passkey registration error:", err);
-
       setPasskeyError(
         err?.response?.data?.detail ||
           err?.message ||
           "Could not register your passkey. Please try again.",
+      );
+    } finally {
+      setPasskeyLoading(false);
+    }
+  };
+
+  const handlePasskeyRemoval = async (id = null) => {
+    if (!window.confirm("Are you sure you want to remove this passkey?")) {
+      return;
+    }
+    setPasskeyLoading(true);
+    setPasskeyMessage("");
+    setPasskeyError("");
+
+    try {
+      await removePasskey(id);
+      setPasskeyMessage("Passkey removed successfully.");
+      await loadPasskeyStatus();
+    } catch (err) {
+      setPasskeyError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Could not remove passkey. Please try again.",
       );
     } finally {
       setPasskeyLoading(false);
@@ -366,7 +379,7 @@ const options = JSON.parse(optionsResponse.data.options);
                     Attendance security
                   </span>
 
-                  <h2>Set up your passkey</h2>
+                  <h2>{passkeyStatus.has_passkey ? "Your registered passkey" : "Set up your passkey"}</h2>
 
                   <p>
                     CampusPulse requires a passkey before you can mark
@@ -375,11 +388,44 @@ const options = JSON.parse(optionsResponse.data.options);
                   </p>
                 </div>
 
-                <span className="cp-security-status">
-                  <span />
-                  Required
+                <span className={`cp-security-status ${passkeyStatus.has_passkey ? "active" : ""}`} style={{ color: passkeyStatus.has_passkey ? "#10b981" : undefined }}>
+                  <span style={{ backgroundColor: passkeyStatus.has_passkey ? "#10b981" : undefined }} />
+                  {passkeyStatus.has_passkey ? "Configured & Active" : "Required"}
                 </span>
               </div>
+
+              {passkeyStatus.has_passkey && passkeyStatus.passkeys?.length > 0 && (
+                <div style={{ margin: "1rem 0", padding: "1rem", borderRadius: "10px", background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div>
+                      <strong style={{ display: "block", color: "#065f46" }}>
+                        🔒 {passkeyStatus.passkeys[0].device_name || "Device Passkey"}
+                      </strong>
+                      <span style={{ fontSize: "0.85rem", color: "#047857" }}>
+                        Registered on {new Date(passkeyStatus.passkeys[0].created_at).toLocaleDateString()}
+                        {passkeyStatus.passkeys[0].last_used_at && ` • Last verified ${new Date(passkeyStatus.passkeys[0].last_used_at).toLocaleDateString()}`}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePasskeyRemoval(passkeyStatus.passkeys[0].id)}
+                      disabled={passkeyLoading}
+                      style={{
+                        padding: "0.4rem 0.8rem",
+                        fontSize: "0.82rem",
+                        color: "#b91c1c",
+                        backgroundColor: "transparent",
+                        border: "1px solid rgba(185, 28, 28, 0.3)",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Remove passkey
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {passkeyMessage && (
                 <div
@@ -391,7 +437,7 @@ const options = JSON.parse(optionsResponse.data.options);
                   </span>
 
                   <div>
-                    <strong>Passkey ready</strong>
+                    <strong>Passkey updated</strong>
                     <span>{passkeyMessage}</span>
                   </div>
                 </div>
@@ -405,7 +451,7 @@ const options = JSON.parse(optionsResponse.data.options);
                   <span className="cp-security-feedback-icon">!</span>
 
                   <div>
-                    <strong>Passkey setup failed</strong>
+                    <strong>Passkey operation failed</strong>
                     <span>{passkeyError}</span>
                   </div>
                 </div>
@@ -413,7 +459,9 @@ const options = JSON.parse(optionsResponse.data.options);
 
               <div className="cp-security-form-footer">
                 <span>
-                  You only need to set up your passkey once on this device.
+                  {passkeyStatus.has_passkey
+                    ? "Your device passkey is active and ready for attendance check-ins."
+                    : "You only need to set up your passkey once on this device."}
                 </span>
 
                 <button
@@ -429,7 +477,7 @@ const options = JSON.parse(optionsResponse.data.options);
                     </>
                   ) : (
                     <>
-                      Set up passkey
+                      {passkeyStatus.has_passkey ? "Register new / replacement passkey" : "Set up passkey"}
 
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M5 12h13" />

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import { authenticatePasskeyForSession } from "../utils/passkey";
 
 function RefreshIcon() {
   return (
@@ -127,22 +128,28 @@ function StudentAttendance() {
     requestLocation(
       async (position) => {
         try {
+          setMessage("Verifying your passkey on this device...");
+          const attendanceGrant = await authenticatePasskeyForSession(id);
+
+          setMessage("Submitting attendance check-in...");
           const response = await api.post(
             `/attendance/sessions/${id}/checkin/`,
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
+              attendance_grant: attendanceGrant,
             },
           );
 
           setMessage(response.data.detail || "Successfully checked in!");
-
           await loadSessions();
         } catch (requestError) {
-          setError(
+          setMessage("");
+          const detail =
             requestError.response?.data?.detail ||
-              "Check-in failed. Ensure you are physically inside the lecture hall.",
-          );
+            requestError.message ||
+            "Check-in failed. Ensure you are physically inside the lecture hall.";
+          setError(detail);
         } finally {
           setChecking(null);
         }
@@ -229,6 +236,25 @@ function StudentAttendance() {
               <p>
                 Add your matric number, WhatsApp number, and class
                 representative code in your profile first. <Link to="/profile">Complete your profile</Link>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {profile && profile.registration_completed && profile.has_passkey === false && (
+          <div className="cp-attendance-feedback error" role="status">
+            <span className="cp-attendance-feedback-icon">
+              <ShieldIcon />
+            </span>
+
+            <div>
+              <strong>Passkey required for attendance</strong>
+
+              <p>
+                CampusPulse requires biometric or device PIN passkey verification before marking attendance.{" "}
+                <Link to="/security" style={{ fontWeight: 600, textDecoration: "underline" }}>
+                  Set up your passkey in Security settings
+                </Link>
               </p>
             </div>
           </div>

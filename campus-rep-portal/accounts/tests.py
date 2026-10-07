@@ -1,8 +1,15 @@
-from django.test import TestCase
+import base64
+from datetime import timedelta
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.test import TestCase, override_settings
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
-from accounts.models import Department
+from accounts.models import Department, PasskeyChallenge, PasskeyCredential
 from accounts.serializers import SignupSerializer
+from accounts.views import get_webauthn_rp_id
 from attendance.models import ClassCode
 
 User = get_user_model()
@@ -170,3 +177,69 @@ class ClassmatesAndManagementTests(TestCase):
         # Student attempting delete
         response = self.client.delete(f'/api/accounts/classmates/{self.student2.id}/delete-account/')
         self.assertEqual(response.status_code, 403)
+
+
+class PasskeyAuthenticationTests(TestCase):
+    @override_settings(WEBAUTHN_RP_ID='campusoou.netlify.app')
+    def test_configured_rp_id_is_used_for_netlify_deploy_preview(self):
+        request = SimpleNamespace(headers={
+            'Origin': 'https://deploy-preview-1--campusoou.netlify.app',
+        })
+
+        self.assertEqual(get_webauthn_rp_id(request), 'campusoou.netlify.app')
+
+    def test_authentication_verification_calls_webauthn_verifier(self):
+        self.client = APIClient()
+        user = User.objects.create_user(
+            username='passkey_student',
+            password='StrongPass123',
+        )
+        self.client.force_authenticate(user=user)
+        credential_id = b'passkey-credential-id'
+        challenge_bytes = b'passkey-auth-challenge'
+        passkey = PasskeyCredential.objects.create(
+            user=user,
+            credential_id=credential_id,
+            public_key=b'passkey-public-key',
+        )
+        challenge = PasskeyChallenge.objects.create(
+            user=user,
+            challenge=challenge_bytes,
+            challenge_type='AUTHENTICATION',
+            session_id=123,
+            expires_at=timezone.now() + timedelta(minutes=5),
+        )
+        encoded_credential_id = base64.urlsafe_b64encode(credential_id).rstrip(b'=').decode()
+        verification_result = SimpleNamespace(
+            new_sign_count=1,
+            credential_device_type=None,
+            credential_backed_up=False,
+        )
+
+        with patch(
+            'accounts.views.verify_authentication_response',
+            return_value=verification_result,
+        ) as verify_response:
+            response = self.client.post(
+                '/api/accounts/passkeys/auth/verify/',
+                {
+                    'challenge_id': challenge.id,
+                    'credential': {
+                        'id': encoded_credential_id,
+                        'rawId': encoded_credential_id,
+                    },
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data['verified'])
+        verify_response.assert_called_once()
+        self.assertEqual(
+            verify_response.call_args.kwargs['expected_challenge'],
+            challenge_bytes,
+        )
+        challenge.refresh_from_db()
+        passkey.refresh_from_db()
+        self.assertTrue(challenge.used)
+        self.assertEqual(passkey.sign_count, 1)

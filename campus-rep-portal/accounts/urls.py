@@ -3,8 +3,8 @@ from .views import (
     ChangePasswordView, ClassmatesView, DeleteStudentAccountView, DepartmentListView,
     ForgotPasswordView, MyProfileView, PreferencesView, ResetPasswordView,
     SaveSubscriptionView, SignupView, ToggleSuspendStudentView, UpdateMatricView,PasskeyRegistrationOptionsView,
-PasskeyRegistrationVerifyView,PasskeyAuthenticationOptionsView,
-PasskeyAuthenticationVerifyView,
+    PasskeyRegistrationVerifyView, PasskeyAuthenticationOptionsView,
+    PasskeyAuthenticationVerifyView, PasskeyStatusView,
 )
 
 urlpatterns = [
@@ -20,26 +20,11 @@ urlpatterns = [
     path('classmates/', ClassmatesView.as_view(), name='classmates'),
     path('classmates/<int:pk>/toggle-suspend/', ToggleSuspendStudentView.as_view(), name='toggle-suspend-student'),
     path('classmates/<int:pk>/delete-account/', DeleteStudentAccountView.as_view(), name='delete-student-account'),
-    path(
-    "passkeys/register/options/",
-    PasskeyRegistrationOptionsView.as_view(),
-    name="passkey-register-options",
-),
-
-path(
-    "passkeys/register/verify/",
-    PasskeyRegistrationVerifyView.as_view(),
-    name="passkey-register-verify",
-),
-path(
-    "passkeys/auth/options/",
-    PasskeyAuthenticationOptionsView.as_view(),
-    name="passkey-auth-options",
-),
-
-path(
-    "passkeys/auth/verify/",
-    PasskeyAuthenticationVerifyView.as_view(),
-    name="passkey-auth-verify",
-),
+    path('passkeys/status/', PasskeyStatusView.as_view(), name='passkey-status'),
+    path('passkeys/delete-all/', PasskeyStatusView.as_view(), name='passkey-delete-all'),
+    path('passkeys/<int:pk>/delete/', PasskeyStatusView.as_view(), name='passkey-delete'),
+    path('passkeys/register/options/', PasskeyRegistrationOptionsView.as_view(), name='passkey-register-options'),
+    path('passkeys/register/verify/', PasskeyRegistrationVerifyView.as_view(), name='passkey-register-verify'),
+    path('passkeys/auth/options/', PasskeyAuthenticationOptionsView.as_view(), name='passkey-auth-options'),
+    path('passkeys/auth/verify/', PasskeyAuthenticationVerifyView.as_view(), name='passkey-auth-verify'),
 ]

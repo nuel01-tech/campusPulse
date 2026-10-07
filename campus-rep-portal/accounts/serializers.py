@@ -54,6 +54,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     faculty = serializers.CharField(source='department.faculty', read_only=True, allow_null=True)
     role_label = serializers.CharField(source='get_role_display', read_only=True)
     level_label = serializers.CharField(source='get_level_display', read_only=True)
+    has_passkey = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -61,12 +62,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'username', 'first_name', 'last_name', 'email', 'phone_number',
             'role', 'role_label', 'department', 'department_name', 'faculty',
             'level', 'level_label', 'matric_number', 'profile_picture', 'terms_accepted_at',
-            'registration_completed'
+            'registration_completed', 'has_passkey'
         ]
         read_only_fields = [
             'id', 'username', 'email', 'role', 'role_label', 'department',
-            'department_name', 'faculty', 'terms_accepted_at'
+            'department_name', 'faculty', 'terms_accepted_at', 'has_passkey'
         ]
+
+    def get_has_passkey(self, obj):
+        return obj.passkeys.filter(is_active=True).exists()
 
     def validate_profile_picture(self, value):
         if value and value.size > 5 * 1024 * 1024:
