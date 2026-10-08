@@ -1,11 +1,12 @@
 from django.urls import path
 from .views import (
     ChangePasswordView, ClassmatesView, DeleteStudentAccountView, DepartmentListView,
-    ForgotPasswordView, MyProfileView, PreferencesView, ResetPasswordView,
+    MyProfileView, PreferencesView, ResetPasswordView,
     SaveSubscriptionView, SignupView, ToggleSuspendStudentView, UpdateMatricView,PasskeyRegistrationOptionsView,
     PasskeyRegistrationVerifyView, PasskeyAuthenticationOptionsView,
     PasskeyAuthenticationVerifyView, PasskeyStatusView,
 )
+from .password_reset import ForgotPasswordView
 from .admin_api import (
     AdminAnnouncementDetailView,
     AdminAnnouncementListView,

@@ -44,6 +44,18 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+### Password reset email (Resend)
+
+Set these values in the backend `.env` file and as secrets/environment variables on the deployed backend:
+
+```dotenv
+RESEND_API_KEY=re_your_resend_api_key
+RESEND_FROM_EMAIL=no-reply@campuspulse.app
+FRONTEND_URL=https://your-frontend-domain
+```
+
+Verify the sender domain in Resend before sending live email. Keep the API key private; do not add it to frontend environment variables or commit it to the repository.
+
 ### Frontend
 
 ```bash
