@@ -419,8 +419,8 @@ class PasskeyRegistrationOptionsView(APIView):
                 user_id=str(user.id).encode("utf-8"),
                 user_name=user.username,
                 user_display_name=user.get_full_name() or user.username,
-                authenticator_attachment=AuthenticatorAttachment.PLATFORM,
                 authenticator_selection=AuthenticatorSelectionCriteria(
+                    authenticator_attachment=AuthenticatorAttachment.PLATFORM,
                     resident_key=ResidentKeyRequirement.PREFERRED,
                     user_verification=UserVerificationRequirement.PREFERRED,
                 ),

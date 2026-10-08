@@ -96,10 +96,13 @@ function Security() {
       setPasskeyMessage(response.detail || "Passkey registered successfully.");
       setPasskeyStatus(await fetchPasskeyStatus());
     } catch (requestError) {
+      const responseData = requestError.response?.data;
+      const serverError =
+        responseData?.error && responseData?.error_type
+          ? ` (${responseData.error_type}: ${responseData.error})`
+          : "";
       setPasskeyError(
-        requestError.response?.data?.detail ||
-          requestError.message ||
-          "Unable to register a passkey.",
+        `${responseData?.detail || requestError.message || "Unable to register a passkey."}${serverError}`,
       );
     } finally {
       setPasskeyLoading(false);
