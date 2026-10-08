@@ -7,9 +7,11 @@ from .views import (
     PasskeyAuthenticationVerifyView, PasskeyStatusView,
 )
 from .password_reset import ForgotPasswordView
+from .lecturers import LecturerAssignmentListView, LecturerDirectoryView
 from .admin_api import (
     AdminAnnouncementDetailView,
     AdminAnnouncementListView,
+    AdminApproveLecturerView,
     AdminAuditView,
     AdminClassCodeListView,
     AdminClassCodeRotateView,
@@ -18,7 +20,9 @@ from .admin_api import (
     AdminDocumentDetailView,
     AdminDocumentListView,
     AdminSessionListView,
+    AdminRemoveUserPasskeysView,
     AdminSummaryView,
+    AdminPendingLecturersView,
     AdminUserDetailView,
     AdminUserListView,
 )
@@ -32,6 +36,8 @@ urlpatterns = [
     path('change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('lecturers/', LecturerDirectoryView.as_view(), name='lecturer-directory'),
+    path('lecturer/assignments/', LecturerAssignmentListView.as_view(), name='lecturer-assignments'),
     path('save-subscription/', SaveSubscriptionView.as_view(), name='save-subscription'),
     path('classmates/', ClassmatesView.as_view(), name='classmates'),
     path('classmates/<int:pk>/toggle-suspend/', ToggleSuspendStudentView.as_view(), name='toggle-suspend-student'),
@@ -39,6 +45,9 @@ urlpatterns = [
     path('admin/summary/', AdminSummaryView.as_view(), name='admin-summary'),
     path('admin/users/', AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<int:pk>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
+    path('admin/users/<int:pk>/passkeys/', AdminRemoveUserPasskeysView.as_view(), name='admin-user-passkeys'),
+    path('admin/lecturers/pending/', AdminPendingLecturersView.as_view(), name='admin-pending-lecturers'),
+    path('admin/lecturers/<int:pk>/approve/', AdminApproveLecturerView.as_view(), name='admin-approve-lecturer'),
     path('admin/departments/', AdminDepartmentListView.as_view(), name='admin-departments'),
     path('admin/departments/<int:pk>/', AdminDepartmentDetailView.as_view(), name='admin-department-detail'),
     path('admin/class-codes/', AdminClassCodeListView.as_view(), name='admin-class-codes'),
@@ -51,8 +60,6 @@ urlpatterns = [
     path('admin/documents/<int:pk>/', AdminDocumentDetailView.as_view(), name='admin-document-detail'),
     path('admin/audit/', AdminAuditView.as_view(), name='admin-audit'),
     path('passkeys/status/', PasskeyStatusView.as_view(), name='passkey-status'),
-    path('passkeys/delete-all/', PasskeyStatusView.as_view(), name='passkey-delete-all'),
-    path('passkeys/<int:pk>/delete/', PasskeyStatusView.as_view(), name='passkey-delete'),
     path('passkeys/register/options/', PasskeyRegistrationOptionsView.as_view(), name='passkey-register-options'),
     path('passkeys/register/verify/', PasskeyRegistrationVerifyView.as_view(), name='passkey-register-verify'),
     path('passkeys/auth/options/', PasskeyAuthenticationOptionsView.as_view(), name='passkey-auth-options'),

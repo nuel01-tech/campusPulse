@@ -16,7 +16,12 @@ from attendance.models import (
     Notification,
 )
 from accounts.push import send_email_to_user, send_push_to_user
-from .models import AdminAuditEvent, Department, User
+from .models import (
+    AdminAuditEvent,
+    Department,
+    PasskeyCredential,
+    User,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -74,8 +79,10 @@ def user_data(user):
         "phone_number": user.phone_number or "",
         "is_active": user.is_active,
         "is_superuser": user.is_superuser,
+        "lecturer_approved": user.lecturer_approved,
         "date_joined": user.date_joined,
         "registration_completed": user.registration_completed,
+        "passkey_count": getattr(user, "passkey_count", 0),
     }
 
 
@@ -160,7 +167,11 @@ class AdminUserListView(APIView):
     pagination_class = AdminPagination
 
     def get(self, request):
-        users = User.objects.select_related("department").order_by("username")
+        users = (
+            User.objects.select_related("department")
+            .annotate(passkey_count=Count("passkeys"))
+            .order_by("username")
+        )
         search = (request.query_params.get("search") or "").strip()
         role = (request.query_params.get("role") or "").strip().upper()
         department_id = (request.query_params.get("department") or "").strip()
@@ -175,7 +186,7 @@ class AdminUserListView(APIView):
                 | Q(email__icontains=search)
                 | Q(matric_number__icontains=search)
             )
-        if role in {"STUDENT", "CLASS_REP"}:
+        if role in {"STUDENT", "CLASS_REP", "LECTURER"}:
             users = users.filter(role=role, is_superuser=False)
         elif role == "SUPER_ADMIN":
             users = users.filter(is_superuser=True)
@@ -249,6 +260,15 @@ class AdminUserDetailView(APIView):
                     {"is_active": "This field must be true or false."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if (
+                user.role == "LECTURER"
+                and not user.lecturer_approved
+                and data["is_active"]
+            ):
+                return Response(
+                    {"is_active": "Use Lecturer approvals to activate a lecturer account."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             changes["is_active"] = data["is_active"]
 
         for field in ("first_name", "last_name"):
@@ -298,6 +318,104 @@ class AdminUserDetailView(APIView):
                 else "Account updated."
             ),
             "user": user_data(user),
+        })
+
+
+class AdminPendingLecturersView(APIView):
+    permission_classes = [IsSiteSuperuser]
+
+    def get(self, request):
+        lecturers = (
+            User.objects.filter(role="LECTURER", lecturer_approved=False)
+            .prefetch_related("teaching_assignments__department")
+            .order_by("date_joined")
+        )
+        return Response([
+            {
+                "id": lecturer.pk,
+                "username": lecturer.username,
+                "first_name": lecturer.first_name,
+                "last_name": lecturer.last_name,
+                "email": lecturer.email,
+                "date_joined": lecturer.date_joined,
+                "assignments": [
+                    {
+                        "department": assignment.department.name,
+                        "level": assignment.level,
+                    }
+                    for assignment in lecturer.teaching_assignments.all()
+                ],
+            }
+            for lecturer in lecturers
+        ])
+
+
+class AdminApproveLecturerView(APIView):
+    permission_classes = [IsSiteSuperuser]
+
+    def post(self, request, pk):
+        try:
+            lecturer = User.objects.get(pk=pk, role="LECTURER")
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "Lecturer account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not lecturer.teaching_assignments.exists():
+            return Response(
+                {"detail": "This lecturer has no department and level assignments."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            lecturer.lecturer_approved = True
+            lecturer.is_active = True
+            lecturer.save(update_fields=["lecturer_approved", "is_active"])
+            log_admin_action(
+                request,
+                "LECTURER_APPROVED",
+                "User",
+                lecturer.pk,
+                f"Approved lecturer account {lecturer.username}.",
+            )
+
+        return Response({
+            "detail": "Lecturer approved and can now sign in.",
+            "id": lecturer.pk,
+        })
+
+
+class AdminRemoveUserPasskeysView(APIView):
+    permission_classes = [IsSiteSuperuser]
+
+    def delete(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if user.is_superuser:
+            return Response(
+                {"detail": "Owner passkeys cannot be removed from this dashboard."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        passkeys = PasskeyCredential.objects.filter(user=user)
+        count = passkeys.count()
+        passkeys.delete()
+        log_admin_action(
+            request,
+            "PASSKEYS_REMOVED",
+            "User",
+            user.pk,
+            f"Removed {count} passkey(s) for {user.username}.",
+        )
+        return Response({
+            "detail": f"Removed {count} passkey(s) for {user.username}.",
+            "deleted_count": count,
         })
 
 

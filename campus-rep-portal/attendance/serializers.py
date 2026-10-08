@@ -4,12 +4,17 @@ from .models import LectureSession, Announcement, CampusDocument
 
 
 class LectureSessionSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        required=False,
+    )
     attendee_count = serializers.SerializerMethodField()
 
     class Meta:
         model = LectureSession
         fields = '__all__'
-        read_only_fields = ['department', 'is_active', 'has_ended', 'created_at']
+        read_only_fields = ['created_by', 'is_active', 'has_ended', 'created_at']
 
     def get_attendee_count(self, obj):
         return obj.attendancerecord_set.count()

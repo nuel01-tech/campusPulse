@@ -9,6 +9,13 @@ from cloudinary_storage.storage import RawMediaCloudinaryStorage
 
 class LectureSession(models.Model):
     department = models.ForeignKey(Department, on_delete=models.PROTECT)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lecture_sessions",
+    )
     level = models.CharField(max_length=3, choices=[
         ('100', '100 Level'),
         ('200', '200 Level'),

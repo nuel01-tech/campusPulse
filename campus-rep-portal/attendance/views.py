@@ -1,5 +1,3 @@
-from requests import request
-
 from rest_framework import generics, permissions
 from .models import LectureSession
 from rest_framework import serializers
@@ -8,7 +6,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import HttpResponse, FileResponse
 from django.utils.text import get_valid_filename
-from django.utils import timezone
 from django.db import models
 from rest_framework import status
 from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
@@ -19,9 +16,8 @@ from rest_framework.exceptions import ValidationError
 from .models import AuditLog
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
-from accounts.models import User
+from accounts.models import LecturerTeachingAssignment, User
 from accounts.push import send_email_to_user, send_push_to_user
-from accounts.models import AttendancePasskeyGrant
 
 class AnnouncementListView(generics.ListAPIView):
     serializer_class = AnnouncementSerializer
@@ -38,63 +34,30 @@ class CheckInView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        if request.user.role == 'STUDENT' and not request.user.registration_completed:
+        if request.user.role != 'STUDENT':
+            return Response(
+                {"detail": "Only student accounts can check in to attendance sessions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not request.user.registration_completed:
             return Response(
                 {"detail": "Complete registration with your matric number, WhatsApp number, and class representative code before checking in."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        attendance_grant = None
-        # Students must prove their identity with a passkey before marking attendance.
-        if request.user.role == 'STUDENT':
-            attendance_grant_token = request.data.get("attendance_grant")
-
-            if not attendance_grant_token:
-                return Response(
-                    {
-                        "detail": (
-                            "Passkey verification is required "
-                            "before marking attendance."
-                        )
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            try:
-                attendance_grant = AttendancePasskeyGrant.objects.get(
-                    token=attendance_grant_token,
-                    user=request.user,
-                    session_id=pk,
-                    used=False,
-                )
-            except (AttendancePasskeyGrant.DoesNotExist, ValueError):
-                return Response(
-                    {
-                        "detail": (
-                            "Invalid attendance authorization. "
-                            "Please verify your passkey again."
-                        )
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            if attendance_grant.expires_at < timezone.now():
-                attendance_grant.used = True
-                attendance_grant.save(update_fields=["used"])
-
-                return Response(
-                    {
-                        "detail": (
-                            "Your attendance authorization has expired. "
-                            "Please verify your passkey again."
-                        )
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
 
         try:
             session = LectureSession.objects.get(pk=pk, is_active=True)
         except LectureSession.DoesNotExist:
             return Response({"detail": "No active session found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if (
+            request.user.department_id != session.department_id
+            or request.user.level != session.level
+        ):
+            return Response(
+                {"detail": "This session is not assigned to your department and level."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         student_lat = request.data.get('latitude')
         student_lon = request.data.get('longitude')
@@ -118,37 +81,69 @@ class CheckInView(APIView):
         if not created:
             return Response({"detail": "Already checked in."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # The attendance was successfully created.
-        # The passkey grant can now be consumed.
-        if attendance_grant:
-            attendance_grant.used = True
-            attendance_grant.save(update_fields=["used"])
+        return Response({"detail": "Checked in successfully.", "distance_meters": int(distance)}, status=status.HTTP_201_CREATED)
 
-        return Response(
-            {
-                "detail": "Checked in successfully.",
-                "distance_meters": int(distance),
-            },
-            status=status.HTTP_201_CREATED,
-        )
 class IsClassRep(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == 'CLASS_REP'
 
 
+class IsSessionManager(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and (
+                user.role == "CLASS_REP"
+                or (
+                    user.role == "LECTURER"
+                    and user.lecturer_approved
+                    and user.is_active
+                )
+            )
+        )
+
+
+def session_queryset_for_manager(user):
+    if user.role == "LECTURER":
+        return LectureSession.objects.filter(created_by=user)
+    return LectureSession.objects.filter(department=user.department)
+
+
 class LectureSessionCreateView(generics.CreateAPIView):
     queryset = LectureSession.objects.all()
     serializer_class = LectureSessionSerializer
-    permission_classes = [IsClassRep]
+    permission_classes = [IsSessionManager]
 
     def perform_create(self, serializer):
+        user = self.request.user
+        level = serializer.validated_data["level"]
+        if user.role == "LECTURER":
+            department = serializer.validated_data.get("department")
+            if not department or not LecturerTeachingAssignment.objects.filter(
+                lecturer=user,
+                department=department,
+                level=level,
+            ).exists():
+                raise ValidationError(
+                    {"department": "Choose a department and level approved for your lecturer account."}
+                )
+        else:
+            department = user.department
+            if not department:
+                raise ValidationError(
+                    {"department": "Your account is not assigned to a department."}
+                )
+
         session = serializer.save(
-            department=self.request.user.department,
+            department=department,
+            created_by=user,
             is_active=False,
             has_ended=False,
         )
         AuditLog.objects.create(
-            rep=self.request.user,
+            rep=user,
             action='CREATED',
             course_code=session.course_code,
             venue_name=session.venue_name,
@@ -177,14 +172,11 @@ class LectureSessionCreateView(generics.CreateAPIView):
             except Exception:
                 pass
 class LectureSessionToggleView(APIView):
-    permission_classes = [IsClassRep]
+    permission_classes = [IsSessionManager]
 
     def post(self, request, pk):
         try:
-            session = LectureSession.objects.get(
-                pk=pk,
-                department=request.user.department,
-            )
+            session = session_queryset_for_manager(request.user).get(pk=pk)
         except LectureSession.DoesNotExist:
             return Response({'detail': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -280,13 +272,10 @@ class ActiveSessionsView(generics.ListAPIView):
         )
 class MySessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
-    permission_classes = [IsClassRep]
+    permission_classes = [IsSessionManager]
 
     def get_queryset(self):
-        return LectureSession.objects.filter(
-            department=self.request.user.department,
-            level=self.request.user.level,
-        ).order_by('-created_at')
+        return session_queryset_for_manager(self.request.user).order_by('-created_at')
 class MyStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -353,11 +342,11 @@ class LectureSessionDeleteView(generics.DestroyAPIView):
         instance.delete()
 
 class ExportAttendanceView(APIView):
-    permission_classes = [IsClassRep]
+    permission_classes = [IsSessionManager]
 
     def get(self, request, pk):
         try:
-            session = LectureSession.objects.get(pk=pk, department=request.user.department)
+            session = session_queryset_for_manager(request.user).get(pk=pk)
         except LectureSession.DoesNotExist:
             return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -408,7 +397,8 @@ class ExportAttendanceView(APIView):
         ws.column_dimensions['C'].width = 20
 
         sig_row = row + 2
-        ws.cell(row=sig_row, column=1, value="Class Rep's Signature: _______________________").font = Font(size=10)
+        signature = "Lecturer's" if request.user.role == "LECTURER" else "Class Rep's"
+        ws.cell(row=sig_row, column=1, value=f"{signature} Signature: _______________________").font = Font(size=10)
 
         response = HttpResponse(
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -434,7 +424,7 @@ class CampusDocumentListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = CampusDocument.objects.select_related('department', 'uploaded_by')
-        if not user.is_superuser and user.role != 'SUPER_ADMIN':
+        if user.role != 'SUPER_ADMIN':
             if not user.department:
                 return queryset.none()
             # Keep academic documents inside the user's department and level.
@@ -451,24 +441,16 @@ class CampusDocumentListCreateView(generics.ListCreateAPIView):
         return queryset
 
     def perform_create(self, serializer):
-        user = self.request.user
-        if user.is_superuser:
-            department = serializer.validated_data.get('department')
-            if not department:
-                raise ValidationError({'department': 'Choose the department for this document.'})
-            serializer.save(department=department, uploaded_by=user)
-            return
-
-        if user.role not in {'STUDENT', 'CLASS_REP'}:
+        if self.request.user.role not in {'STUDENT', 'CLASS_REP'}:
             raise ValidationError('Only students and class representatives can upload documents.')
-        if not user.department or not user.level:
+        if not self.request.user.department or not self.request.user.level:
             raise ValidationError('Complete your department and level before uploading a document.')
         level = serializer.validated_data.get('level')
-        if level != user.level:
+        if level != self.request.user.level:
             raise ValidationError({'level': 'You can only upload documents for your current level.'})
         serializer.save(
-            department=user.department,
-            uploaded_by=user,
+            department=self.request.user.department,
+            uploaded_by=self.request.user,
         )
 
 
@@ -481,7 +463,7 @@ class CampusDocumentDownloadView(APIView):
         except CampusDocument.DoesNotExist:
             return Response({'detail': 'Document not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not request.user.is_superuser and request.user.role != 'SUPER_ADMIN' and (
+        if request.user.role != 'SUPER_ADMIN' and (
             document.department_id != getattr(request.user.department, 'id', None)
             or document.level != request.user.level
         ):
@@ -504,10 +486,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
-    rep_name = serializers.SerializerMethodField()
-
-    def get_rep_name(self, obj):
-        return obj.rep.get_full_name() or obj.rep.username
+    rep_name = serializers.CharField(source='rep.get_full_name', read_only=True)
 
     class Meta:
         model = AuditLog

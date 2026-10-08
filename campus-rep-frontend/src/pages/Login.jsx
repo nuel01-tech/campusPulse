@@ -52,6 +52,8 @@ function Login() {
           ? "/admin"
           : d.role === "CLASS_REP"
             ? "/rep"
+            : d.role === "LECTURER"
+              ? "/lecturer"
             : "/student",
       );
     } catch {

@@ -33,6 +33,7 @@ function AdminDashboard() {
   const [announcements, setAnnouncements] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [auditEvents, setAuditEvents] = useState([]);
+  const [lecturerApprovals, setLecturerApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState("");
@@ -62,6 +63,7 @@ function AdminDashboard() {
   const [documentFile, setDocumentFile] = useState(null);
   const [publishingAnnouncement, setPublishingAnnouncement] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [adminActionId, setAdminActionId] = useState(null);
   const documentInputRef = useRef(null);
 
   const title = useMemo(
@@ -75,6 +77,7 @@ function AdminDashboard() {
         announcements: "Announcements",
         documents: "Documents",
         audit: "Audit history",
+        lecturers: "Lecturer approvals",
       })[section] || "Owner dashboard",
     [section],
   );
@@ -161,6 +164,23 @@ function AdminDashboard() {
     };
   }, [section]);
 
+  useEffect(() => {
+    if (section !== "lecturers") return;
+    let cancelled = false;
+    api.get("/accounts/admin/lecturers/pending/")
+      .then((response) => {
+        if (!cancelled) setLecturerApprovals(response.data || []);
+      })
+      .catch((requestError) => {
+        if (!cancelled) {
+          setError(getErrorMessage(requestError, "Unable to load lecturer applications."));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section]);
+
   const reload = async () => {
     setLoading(true);
     setError("");
@@ -221,6 +241,53 @@ function AdminDashboard() {
       setNotice(response.data.detail);
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Unable to update this account."));
+    }
+  };
+
+  const approveLecturer = async (lecturer) => {
+    setAdminActionId(`approve-${lecturer.id}`);
+    setError("");
+    setNotice("");
+    try {
+      const response = await api.post(
+        `/accounts/admin/lecturers/${lecturer.id}/approve/`,
+      );
+      setLecturerApprovals((current) =>
+        current.filter((item) => item.id !== lecturer.id),
+      );
+      setNotice(response.data.detail);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to approve this lecturer."));
+    } finally {
+      setAdminActionId(null);
+    }
+  };
+
+  const removeUserPasskeys = async (user) => {
+    if (
+      !window.confirm(
+        `Remove all registered passkeys for ${user.first_name} ${user.last_name || user.username}? They will need to register a passkey again.`,
+      )
+    ) {
+      return;
+    }
+    setAdminActionId(`passkeys-${user.id}`);
+    setError("");
+    setNotice("");
+    try {
+      const response = await api.delete(
+        `/accounts/admin/users/${user.id}/passkeys/`,
+      );
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id ? { ...item, passkey_count: 0 } : item,
+        ),
+      );
+      setNotice(response.data.detail);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to remove this user's passkeys."));
+    } finally {
+      setAdminActionId(null);
     }
   };
 
@@ -579,7 +646,7 @@ function AdminDashboard() {
                     <small>{user.matric_number || "No matric number"}</small>
                   </td>
                   <td>
-                    {user.is_superuser ? "Owner" : (
+                    {user.is_superuser ? "Owner" : user.role === "LECTURER" ? "Lecturer" : (
                       <select value={draft.role} onChange={(event) => updateUserDraft(user, "role", event.target.value)}>
                         {ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                       </select>
@@ -597,12 +664,26 @@ function AdminDashboard() {
                       {LEVELS.map((level) => <option key={level} value={level}>{level} Level</option>)}
                     </select>
                   </td>
-                  <td><span className={`cp-owner-status ${user.is_active ? "is-active" : "is-inactive"}`}>{user.is_active ? "Active" : "Deactivated"}</span></td>
+                  <td><span className={`cp-owner-status ${user.lecturer_approved === false && user.role === "LECTURER" ? "is-inactive" : user.is_active ? "is-active" : "is-inactive"}`}>{user.role === "LECTURER" && !user.lecturer_approved ? "Pending approval" : user.is_active ? "Active" : "Deactivated"}</span></td>
                   <td>
                     {user.is_superuser ? <span className="cp-owner-muted">Protected</span> : (
                       <div className="cp-owner-row-actions">
                         <button type="button" className="cp-owner-button" disabled={!userDrafts[user.id]} onClick={() => saveUser(user)}>Save</button>
-                        <button type="button" className="cp-owner-button cp-owner-button-muted" onClick={() => saveUser(user, { is_active: !user.is_active })}>{user.is_active ? "Deactivate" : "Restore"}</button>
+                        {!(user.role === "LECTURER" && !user.lecturer_approved) && (
+                          <button type="button" className="cp-owner-button cp-owner-button-muted" onClick={() => saveUser(user, { is_active: !user.is_active })}>{user.is_active ? "Deactivate" : "Restore"}</button>
+                        )}
+                        {user.passkey_count > 0 && (
+                          <button
+                            type="button"
+                            className="cp-owner-button cp-owner-button-muted"
+                            onClick={() => removeUserPasskeys(user)}
+                            disabled={adminActionId === `passkeys-${user.id}`}
+                          >
+                            {adminActionId === `passkeys-${user.id}`
+                              ? "Removing…"
+                              : `Remove ${user.passkey_count} passkey${user.passkey_count === 1 ? "" : "s"}`}
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -620,6 +701,55 @@ function AdminDashboard() {
         </div>
       </div>
       <p className="cp-owner-muted">Accounts are deactivated and restorable here; permanent user deletion is not available from this dashboard.</p>
+    </section>
+  );
+
+  const renderLecturerApprovals = () => (
+    <section className="cp-owner-panel">
+      <div className="cp-owner-panel-heading">
+        <div>
+          <span className="cp-owner-eyebrow">Account verification</span>
+          <h2>{lecturerApprovals.length} pending lecturer applications</h2>
+        </div>
+      </div>
+      {lecturerApprovals.length === 0 ? (
+        <p className="cp-owner-muted">There are no lecturer applications waiting for review.</p>
+      ) : (
+        <div className="cp-owner-table-wrap">
+          <table className="cp-owner-table">
+            <thead>
+              <tr><th>Lecturer</th><th>Email</th><th>Department and levels</th><th>Applied</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              {lecturerApprovals.map((lecturer) => (
+                <tr key={lecturer.id}>
+                  <td><strong>{lecturer.first_name} {lecturer.last_name}</strong><small>@{lecturer.username}</small></td>
+                  <td>{lecturer.email}</td>
+                  <td>
+                    {lecturer.assignments.map((assignment) => (
+                      <small key={`${assignment.department}-${assignment.level}`}>
+                        {assignment.department} · {assignment.level} Level
+                      </small>
+                    ))}
+                  </td>
+                  <td>{new Date(lecturer.date_joined).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="cp-owner-button"
+                      onClick={() => approveLecturer(lecturer)}
+                      disabled={adminActionId === `approve-${lecturer.id}`}
+                    >
+                      {adminActionId === `approve-${lecturer.id}` ? "Approving…" : "Approve"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="cp-owner-muted">Approval enables lecturer sign-in, session creation, attendance control, and Excel exports for the selected classes.</p>
     </section>
   );
 
@@ -782,6 +912,7 @@ function AdminDashboard() {
     announcements: renderAnnouncements,
     documents: renderDocuments,
     audit: renderAudit,
+    lecturers: renderLecturerApprovals,
   }[section] || renderOverview;
 
   return (
@@ -793,7 +924,10 @@ function AdminDashboard() {
             <h1>{title}</h1>
             <p>Manage accounts and academic operations with changes recorded for review.</p>
           </div>
-          <button type="button" className="cp-owner-button cp-owner-button-muted" onClick={reload} disabled={loading}>{loading ? "Refreshing…" : "Refresh data"}</button>
+          <div className="cp-owner-header-actions">
+            <Link to="/admin/lecturers" className="cp-owner-button cp-owner-button-muted">Lecturer approvals</Link>
+            <button type="button" className="cp-owner-button cp-owner-button-muted" onClick={reload} disabled={loading}>{loading ? "Refreshing…" : "Refresh data"}</button>
+          </div>
         </header>
         {error && <div className="cp-owner-feedback is-error" role="alert">{error}<button type="button" onClick={() => setError("")}>Dismiss</button></div>}
         {notice && <div className="cp-owner-feedback is-success" role="status">{notice}<button type="button" onClick={() => setNotice("")}>Dismiss</button></div>}

@@ -1,4 +1,5 @@
 import uuid
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
@@ -15,6 +16,7 @@ class User(AbstractUser):
     ROLES = (
         ('STUDENT', 'Student'),
         ('CLASS_REP', 'Class Representative'),
+        ('LECTURER', 'Lecturer'),
         ('SUPER_ADMIN', 'Super Administrator'),
     )
     LEVELS = (
@@ -25,7 +27,8 @@ class User(AbstractUser):
         ('500', '500 Level'),
     )
     role = models.CharField(max_length=20, choices=ROLES, default='STUDENT')
-    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True, blank=True)
+    lecturer_approved = models.BooleanField(default=False)
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
     enable_wakeup_calls = models.BooleanField(default=False)
     push_notifications = models.BooleanField(default=True)
@@ -39,6 +42,23 @@ class User(AbstractUser):
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
 
 
+class LecturerTeachingAssignment(models.Model):
+    lecturer = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments",
+    )
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
+    level = models.CharField(max_length=3, choices=User.LEVELS)
+
+    class Meta:
+        unique_together = ("lecturer", "department", "level")
+        ordering = ["department__name", "level"]
+
+    def __str__(self):
+        return f"{self.lecturer} · {self.department} · {self.level} Level"
+
+
 class PushSubscription(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     endpoint = models.URLField(max_length=500)
@@ -48,56 +68,31 @@ class PushSubscription(models.Model):
 
     class Meta:
         unique_together = ('user', 'endpoint')
+
+
 class PasskeyCredential(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="passkeys",
     )
-
-    credential_id = models.BinaryField(
-        unique=True,
-    )
-
+    credential_id = models.BinaryField(unique=True)
     public_key = models.BinaryField()
-
-    sign_count = models.PositiveIntegerField(
-        default=0,
-    )
-
-    device_type = models.CharField(
-        max_length=30,
-        blank=True,
-    )
-
-    backed_up = models.BooleanField(
-        default=False,
-    )
-
-    device_name = models.CharField(
-        max_length=100,
-        blank=True,
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-    )
-
-    last_used_at = models.DateTimeField(
-        null=True,
-        blank=True,
-    )
-
-    is_active = models.BooleanField(
-        default=True,
-    )
+    sign_count = models.PositiveIntegerField(default=0)
+    device_type = models.CharField(max_length=30, blank=True)
+    backed_up = models.BooleanField(default=False)
+    device_name = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.user.username} passkey"
-    
+
+
 class PasskeyChallenge(models.Model):
     CHALLENGE_TYPES = (
         ("REGISTRATION", "Registration"),
@@ -109,57 +104,29 @@ class PasskeyChallenge(models.Model):
         on_delete=models.CASCADE,
         related_name="passkey_challenges",
     )
-
     challenge = models.BinaryField()
-
-    challenge_type = models.CharField(
-        max_length=20,
-        choices=CHALLENGE_TYPES,
-    )
-
-    session_id = models.PositiveBigIntegerField(
-    null=True,
-    blank=True,
-)
-
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-    )
-
+    challenge_type = models.CharField(max_length=20, choices=CHALLENGE_TYPES)
+    session_id = models.PositiveBigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
-
-    used = models.BooleanField(
-        default=False,
-    )
+    used = models.BooleanField(default=False)
 
     class Meta:
         indexes = [
-            models.Index(
-                fields=["user", "challenge_type", "used"]
-            ),
+            models.Index(fields=["user", "challenge_type", "used"]),
         ]
+
+
 class AttendancePasskeyGrant(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="attendance_passkey_grants",
     )
-
-    session_id = models.PositiveBigIntegerField(
-    null=True,
-    blank=True,
-)
-
-    token = models.UUIDField(
-        default=uuid.uuid4,
-        unique=True,
-        editable=False,
-    )
-
+    session_id = models.PositiveBigIntegerField(null=True, blank=True)
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
     expires_at = models.DateTimeField()
-
     used = models.BooleanField(default=False)
 
     def __str__(self):

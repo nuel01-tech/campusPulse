@@ -1,0 +1,108 @@
+.cp-signup-role-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cp-signup-role-option,
+.cp-lecturer-department-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: 10px;
+  background: var(--cp-white);
+  cursor: pointer;
+}
+
+.cp-signup-role-option.is-selected {
+  border-color: var(--cp-green-800);
+  background: #f3faf5;
+}
+
+.cp-signup-role-option input,
+.cp-lecturer-department-choice input,
+.cp-lecturer-level-options input {
+  accent-color: var(--cp-green-800);
+}
+
+.cp-signup-role-option > span,
+.cp-lecturer-department-choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cp-signup-role-option strong,
+.cp-lecturer-department-choice strong {
+  color: var(--cp-text);
+  font-size: 12px;
+}
+
+.cp-signup-role-option small,
+.cp-lecturer-department-choice small {
+  color: var(--cp-text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.cp-lecturer-department-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cp-lecturer-department {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--cp-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.cp-lecturer-department-choice {
+  border: 0;
+  border-radius: 0;
+}
+
+.cp-lecturer-level-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 0 12px 12px;
+}
+
+.cp-lecturer-level-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cp-text-soft);
+  font-size: 10px;
+}
+
+.cp-lecturer-signup-help {
+  color: var(--cp-text-muted);
+  font-size: 12px;
+}
+
+.cp-auth-feedback.success {
+  border-color: #b7dfc6;
+  background: #eff9f2;
+  color: #16633a;
+}
+
+.cp-auth-feedback.success a {
+  display: inline-block;
+  margin-top: 5px;
+  color: #0b6e39;
+  font-weight: 750;
+}
+
+@media (max-width: 600px) {
+  .cp-signup-role-options,
+  .cp-lecturer-department-list {
+    grid-template-columns: 1fr;
+  }
+}

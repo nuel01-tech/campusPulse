@@ -11,6 +11,14 @@ function ProtectedRoute({ children, allowedRole }) {
   try {
     const decoded = jwtDecode(token);
 
+    if (
+      allowedRole &&
+      decoded.role === "LECTURER" &&
+      allowedRole !== "LECTURER"
+    ) {
+      return <Navigate to="/lecturer" replace />;
+    }
+
     if (allowedRole && decoded.role !== allowedRole) {
       return <Navigate to="/" replace />;
     }

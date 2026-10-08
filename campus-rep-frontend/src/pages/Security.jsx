@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import AppShell from "../components/AppShell";
 import api from "../api/axios";
-import { registerPasskey, fetchPasskeyStatus, removePasskey } from "../utils/passkey";
+import { fetchPasskeyStatus, registerPasskey } from "../utils/passkey";
 
 function UserIcon() {
   return (
@@ -57,22 +57,13 @@ function Security() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const [passkeyStatus, setPasskeyStatus] = useState({
+    has_passkey: false,
+    passkeys: [],
+  });
   const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [passkeyMessage, setPasskeyMessage] = useState("");
   const [passkeyError, setPasskeyError] = useState("");
-  const [passkeyStatus, setPasskeyStatus] = useState({ has_passkey: false, passkeys: [] });
-
-  const loadPasskeyStatus = async () => {
-    try {
-      const data = await fetchPasskeyStatus();
-      setPasskeyStatus(data);
-    } catch {}
-  };
-
-  useEffect(() => {
-    loadPasskeyStatus();
-  }, []);
+  const [passkeyMessage, setPasskeyMessage] = useState("");
 
   let role = "STUDENT";
 
@@ -80,6 +71,36 @@ function Security() {
     const token = localStorage.getItem("access");
     role = token ? jwtDecode(token).role : "STUDENT";
   } catch {}
+
+  useEffect(() => {
+    fetchPasskeyStatus()
+      .then(setPasskeyStatus)
+      .catch((requestError) => {
+        setPasskeyError(
+          requestError.response?.data?.detail ||
+            "Unable to load passkey status.",
+        );
+      });
+  }, []);
+
+  const setupPasskey = async () => {
+    setPasskeyLoading(true);
+    setPasskeyError("");
+    setPasskeyMessage("");
+    try {
+      const response = await registerPasskey("My device");
+      setPasskeyMessage(response.detail || "Passkey registered successfully.");
+      setPasskeyStatus(await fetchPasskeyStatus());
+    } catch (requestError) {
+      setPasskeyError(
+        requestError.response?.data?.detail ||
+          requestError.message ||
+          "Unable to register a passkey.",
+      );
+    } finally {
+      setPasskeyLoading(false);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -93,9 +114,7 @@ function Security() {
     }
 
     if (currentPassword === newPassword) {
-      setError(
-        "Your new password must be different from your current password.",
-      );
+      setError("Your new password must be different from your current password.");
       return;
     }
 
@@ -113,7 +132,6 @@ function Security() {
       setConfirm("");
     } catch (e) {
       const responseError = e.response?.data;
-
       const validationError = Object.values(responseError || {})
         .flat()
         .find((value) => typeof value === "string");
@@ -124,52 +142,6 @@ function Security() {
       );
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handlePasskeyRegistration = async () => {
-    setPasskeyLoading(true);
-    setPasskeyMessage("");
-    setPasskeyError("");
-
-    try {
-      await registerPasskey("My device");
-      setPasskeyMessage(
-        "Passkey registered successfully! You can now mark attendance securely.",
-      );
-      await loadPasskeyStatus();
-    } catch (err) {
-      console.error("Passkey registration error:", err);
-      setPasskeyError(
-        err?.response?.data?.detail ||
-          err?.message ||
-          "Could not register your passkey. Please try again.",
-      );
-    } finally {
-      setPasskeyLoading(false);
-    }
-  };
-
-  const handlePasskeyRemoval = async (id = null) => {
-    if (!window.confirm("Are you sure you want to remove this passkey?")) {
-      return;
-    }
-    setPasskeyLoading(true);
-    setPasskeyMessage("");
-    setPasskeyError("");
-
-    try {
-      await removePasskey(id);
-      setPasskeyMessage("Passkey removed successfully.");
-      await loadPasskeyStatus();
-    } catch (err) {
-      setPasskeyError(
-        err?.response?.data?.detail ||
-          err?.message ||
-          "Could not remove passkey. Please try again.",
-      );
-    } finally {
-      setPasskeyLoading(false);
     }
   };
 
@@ -254,9 +226,7 @@ function Security() {
 
         {(message || error) && (
           <div
-            className={`cp-security-feedback ${
-              message ? "success" : "error"
-            }`}
+            className={`cp-security-feedback ${message ? "success" : "error"}`}
             role="alert"
           >
             <span className="cp-security-feedback-icon">
@@ -264,10 +234,7 @@ function Security() {
             </span>
 
             <div>
-              <strong>
-                {message ? "Password updated" : "Update failed"}
-              </strong>
-
+              <strong>{message ? "Password updated" : "Update failed"}</strong>
               <span>{message || error}</span>
             </div>
           </div>
@@ -277,9 +244,7 @@ function Security() {
           <section className="cp-security-card cp-security-password-card">
             <div className="cp-security-card-header">
               <div>
-                <span className="cp-security-section-label">
-                  Credentials
-                </span>
+                <span className="cp-security-section-label">Credentials</span>
 
                 <h2>Change password</h2>
 
@@ -360,7 +325,6 @@ function Security() {
                   ) : (
                     <>
                       Update password
-
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M5 12h13" />
                         <path d="m13 6 6 6-6 6" />
@@ -370,124 +334,54 @@ function Security() {
                 </button>
               </div>
             </form>
+          </section>
 
-            {/* PASSKEY SECURITY */}
-            <div className="cp-security-passkey-section">
-              <div className="cp-security-card-header">
-                <div>
-                  <span className="cp-security-section-label">
-                    Attendance security
-                  </span>
-
-                  <h2>{passkeyStatus.has_passkey ? "Your registered passkey" : "Set up your passkey"}</h2>
-
-                  <p>
-                    CampusPulse requires a passkey before you can mark
-                    attendance. Your device will use Face ID, fingerprint, or
-                    your device PIN to verify that it is really you.
-                  </p>
-                </div>
-
-                <span className={`cp-security-status ${passkeyStatus.has_passkey ? "active" : ""}`} style={{ color: passkeyStatus.has_passkey ? "#10b981" : undefined }}>
-                  <span style={{ backgroundColor: passkeyStatus.has_passkey ? "#10b981" : undefined }} />
-                  {passkeyStatus.has_passkey ? "Configured & Active" : "Required"}
-                </span>
-              </div>
-
-              {passkeyStatus.has_passkey && passkeyStatus.passkeys?.length > 0 && (
-                <div style={{ margin: "1rem 0", padding: "1rem", borderRadius: "10px", background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                    <div>
-                      <strong style={{ display: "block", color: "#065f46" }}>
-                        🔒 {passkeyStatus.passkeys[0].device_name || "Device Passkey"}
-                      </strong>
-                      <span style={{ fontSize: "0.85rem", color: "#047857" }}>
-                        Registered on {new Date(passkeyStatus.passkeys[0].created_at).toLocaleDateString()}
-                        {passkeyStatus.passkeys[0].last_used_at && ` • Last verified ${new Date(passkeyStatus.passkeys[0].last_used_at).toLocaleDateString()}`}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handlePasskeyRemoval(passkeyStatus.passkeys[0].id)}
-                      disabled={passkeyLoading}
-                      style={{
-                        padding: "0.4rem 0.8rem",
-                        fontSize: "0.82rem",
-                        color: "#b91c1c",
-                        backgroundColor: "transparent",
-                        border: "1px solid rgba(185, 28, 28, 0.3)",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Remove passkey
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {passkeyMessage && (
-                <div
-                  className="cp-security-feedback success"
-                  role="alert"
-                >
-                  <span className="cp-security-feedback-icon">
-                    <CheckIcon />
-                  </span>
-
-                  <div>
-                    <strong>Passkey updated</strong>
-                    <span>{passkeyMessage}</span>
-                  </div>
-                </div>
-              )}
-
-              {passkeyError && (
-                <div
-                  className="cp-security-feedback error"
-                  role="alert"
-                >
-                  <span className="cp-security-feedback-icon">!</span>
-
-                  <div>
-                    <strong>Passkey operation failed</strong>
-                    <span>{passkeyError}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="cp-security-form-footer">
-                <span>
+          <section className="cp-security-card cp-security-passkey-card">
+            <div className="cp-security-card-header">
+              <div>
+                <span className="cp-security-section-label">Attendance security</span>
+                <h2>
                   {passkeyStatus.has_passkey
-                    ? "Your device passkey is active and ready for attendance check-ins."
-                    : "You only need to set up your passkey once on this device."}
-                </span>
-
-                <button
-                  type="button"
-                  className="cp-security-submit"
-                  onClick={handlePasskeyRegistration}
-                  disabled={passkeyLoading}
-                >
-                  {passkeyLoading ? (
-                    <>
-                      <span className="cp-security-spinner" />
-                      Setting up...
-                    </>
-                  ) : (
-                    <>
-                      {passkeyStatus.has_passkey ? "Register new / replacement passkey" : "Set up passkey"}
-
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 12h13" />
-                        <path d="m13 6 6 6-6 6" />
-                      </svg>
-                    </>
-                  )}
-                </button>
+                    ? "Your device passkey"
+                    : "Set up a device passkey"}
+                </h2>
+                <p>
+                  {passkeyStatus.has_passkey
+                    ? "A passkey is already registered for this account. Students cannot remove it or register another one."
+                    : "Register one passkey for this account to confirm secure attendance check-ins."}
+                </p>
               </div>
+              <span className={`cp-security-status ${passkeyStatus.has_passkey ? "active" : ""}`}>
+                <span />
+                {passkeyStatus.has_passkey ? "Configured" : "Not configured"}
+              </span>
             </div>
+            {passkeyStatus.has_passkey ? (
+              <p className="cp-security-passkey-device">
+                {passkeyStatus.passkeys?.[0]?.device_name || "Registered device"}
+                {passkeyStatus.passkeys?.[0]?.created_at
+                  ? ` · Added ${new Date(passkeyStatus.passkeys[0].created_at).toLocaleDateString()}`
+                  : ""}
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="cp-security-submit"
+                onClick={setupPasskey}
+                disabled={passkeyLoading}
+              >
+                {passkeyLoading ? "Setting up…" : "Set up passkey"}
+              </button>
+            )}
+            {passkeyMessage && (
+              <p className="cp-security-feedback success" role="status">{passkeyMessage}</p>
+            )}
+            {passkeyError && (
+              <p className="cp-security-feedback error" role="alert">{passkeyError}</p>
+            )}
+            <p className="cp-security-passkey-note">
+              Need to replace a lost or changed device? Contact the CampusPulse administrator. Passkeys may sync across devices through your phone’s Apple or Google account.
+            </p>
           </section>
 
           <aside className="cp-security-card cp-security-guidelines">

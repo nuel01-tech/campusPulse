@@ -21,18 +21,6 @@ export async function fetchPasskeyStatus() {
 }
 
 /**
- * Remove a specific passkey or all registered passkeys for the user.
- */
-export async function removePasskey(passkeyId = null) {
-  if (passkeyId) {
-    const res = await api.delete(`/accounts/passkeys/${passkeyId}/delete/`);
-    return res.data;
-  }
-  const res = await api.delete("/accounts/passkeys/delete-all/");
-  return res.data;
-}
-
-/**
  * Perform passkey registration ceremony.
  * Returns the backend verification response.
  */

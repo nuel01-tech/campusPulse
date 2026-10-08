@@ -1,35 +1,21 @@
+import logging
+import traceback
+from datetime import timedelta
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
-from decouple import config
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.utils import timezone
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
-from attendance.models import ClassCode
-from accounts.models import AttendancePasskeyGrant
-from .models import Department, PushSubscription, User
-from .push import send_push_to_user
-import traceback
-from .serializers import (
-    MyTokenObtainPairSerializer, PreferencesSerializer, SignupSerializer,
-    UserProfileSerializer, StudentClassmateSerializer, RepClassmateSerializer,
-)
-from datetime import timedelta
-
-from django.conf import settings
-from django.utils import timezone
-
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
+from rest_framework_simplejwt.views import TokenObtainPairView
 from webauthn import (
     generate_registration_options,
     verify_registration_response,
@@ -37,21 +23,33 @@ from webauthn import (
     verify_authentication_response,
     options_to_json,
 )
-
 from webauthn.helpers.structs import (
     AuthenticatorAttachment,
     AuthenticatorSelectionCriteria,
     ResidentKeyRequirement,
     UserVerificationRequirement,
+    PublicKeyCredentialDescriptor,
+)
+from webauthn.helpers.exceptions import WebAuthnException
+from webauthn.helpers import base64url_to_bytes
+from attendance.models import ClassCode
+from .email import PasswordResetEmailError, send_password_reset_email
+from .models import (
+    AttendancePasskeyGrant,
+    Department,
+    PasskeyChallenge,
+    PasskeyCredential,
+    PushSubscription,
+    User,
+)
+from .push import send_push_to_user
+from .serializers import (
+    MyTokenObtainPairSerializer, PreferencesSerializer, SignupSerializer,
+    UserProfileSerializer, StudentClassmateSerializer, RepClassmateSerializer,
 )
 
-from webauthn.helpers.exceptions import WebAuthnException
-from webauthn.helpers.structs import PublicKeyCredentialDescriptor
-from .models import (
-    PasskeyCredential,
-    PasskeyChallenge,
-    AttendancePasskeyGrant,
-)
+logger = logging.getLogger(__name__)
+
 
 class DepartmentListView(generics.ListAPIView):
     queryset = Department.objects.all().order_by('name')
@@ -72,17 +70,6 @@ class MyProfileView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_object(self):
         return self.request.user
-
-    def destroy(self, request, *args, **kwargs):
-        return Response(
-            {
-                'detail': (
-                    'Permanent account deletion is disabled to preserve class '
-                    'records. Ask the system owner to deactivate your account.'
-                )
-            },
-            status=status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
 
     def update(self, request, *args, **kwargs):
         # Usernames are account identifiers in CampusPulse and cannot be changed.
@@ -160,52 +147,6 @@ class SignupView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
-    def create(self, request, *args, **kwargs):
-        try:
-            print("========== SIGNUP DEBUG START ==========")
-            print("SIGNUP DATA:", {
-                "username": request.data.get("username"),
-                "email": request.data.get("email"),
-                "first_name": request.data.get("first_name"),
-                "last_name": request.data.get("last_name"),
-                "department": request.data.get("department"),
-                "level": request.data.get("level"),
-                "terms_accepted": request.data.get("terms_accepted"),
-            })
-
-            serializer = self.get_serializer(data=request.data)
-
-            print("RUNNING SERIALIZER VALIDATION...")
-            serializer.is_valid(raise_exception=True)
-
-            print("VALIDATED DATA:", serializer.validated_data)
-
-            print("CREATING USER...")
-            self.perform_create(serializer)
-
-            print("USER CREATED:", serializer.instance.pk)
-            print("========== SIGNUP DEBUG SUCCESS ==========")
-
-            headers = self.get_success_headers(serializer.data)
-            return Response(
-                serializer.data,
-                status=status.HTTP_201_CREATED,
-                headers=headers,
-            )
-
-        except Exception as exc:
-            print("========== SIGNUP CRASH ==========")
-            print("EXCEPTION TYPE:", type(exc).__name__)
-            print("EXCEPTION:", str(exc))
-            traceback.print_exc()
-            print("========== SIGNUP CRASH END ==========")
-
-            return Response(
-                {
-                    "detail": f"Signup crashed: {type(exc).__name__}: {str(exc)}"
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -253,22 +194,19 @@ class ForgotPasswordView(APIView):
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173').rstrip('/')
         reset_url = f'{frontend_url}/reset-password/{uid}/{token}'
 
-        try:
-            configuration = sib_api_v3_sdk.Configuration()
-            configuration.api_key['api-key'] = config('BREVO_API_KEY')
-            api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-                to=[{"email": user.email}],
-                sender={"name": "CampusPulse", "email": "no-reply@campuspulse.app"},
-                subject="Reset your CampusPulse password",
-                text_content=f"Use this link to reset your CampusPulse password:\n\n{reset_url}\n\nThis link expires when your password is changed or the token becomes invalid.",
-            )
-            api_instance.send_transac_email(send_smtp_email)
-        except Exception as e:
-            print(f"BREVO ERROR: {e}")
-
-        if settings.DEBUG:
+        if settings.DEBUG and not settings.RESEND_API_KEY:
             generic['reset_url'] = reset_url
+            return Response(generic)
+
+        try:
+            send_password_reset_email(user.email, reset_url)
+        except PasswordResetEmailError:
+            logger.exception("Unable to send password reset email.")
+            return Response(
+                {'detail': 'Password reset email is temporarily unavailable. Please try again later.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         return Response(generic)
 
 
@@ -331,8 +269,6 @@ class ClassmatesView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if not user.department or not user.level:
-            return User.objects.none()
         qs = User.objects.filter(
             department=user.department,
             level=user.level,
@@ -407,9 +343,6 @@ class DeleteStudentAccountView(APIView):
         student.delete()
         return Response({'detail': f"Account '{student_name}' was deleted successfully."})
 
-from urllib.parse import urlparse
-from webauthn.helpers import base64url_to_bytes
-
 
 def get_allowed_webauthn_origins(request=None):
     origins = set()
@@ -417,31 +350,32 @@ def get_allowed_webauthn_origins(request=None):
     if configured_origin:
         origins.add(configured_origin.rstrip("/"))
 
-    for orig in getattr(settings, "CORS_ALLOWED_ORIGINS", []):
-        if orig:
-            origins.add(orig.rstrip("/"))
+    for origin in getattr(settings, "CORS_ALLOWED_ORIGINS", []):
+        if origin:
+            origins.add(origin.rstrip("/"))
 
-    # Common local development origins
-    origins.add("http://localhost:5173")
-    origins.add("http://127.0.0.1:5173")
-    origins.add("http://localhost:3000")
-    origins.add("http://127.0.0.1:3000")
-    origins.add("http://localhost:8000")
-    origins.add("http://127.0.0.1:8000")
+    origins.update({
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    })
 
-    # If incoming request has an Origin header, allow if local or netlify
     if request:
-        req_origin = request.headers.get("Origin")
-        if req_origin:
-            req_clean = req_origin.rstrip("/")
-            parsed = urlparse(req_clean)
-            if parsed.hostname and (
-                parsed.hostname in ["localhost", "127.0.0.1"]
-                or parsed.hostname.endswith(".netlify.app")
-                or parsed.hostname.startswith("192.168.")
-                or parsed.hostname.startswith("10.")
+        request_origin = request.headers.get("Origin")
+        if request_origin:
+            clean_origin = request_origin.rstrip("/")
+            parsed = urlparse(clean_origin)
+            hostname = parsed.hostname or ""
+            if (
+                hostname in {"localhost", "127.0.0.1"}
+                or hostname.endswith(".netlify.app")
+                or hostname.startswith("192.168.")
+                or hostname.startswith("10.")
             ):
-                origins.add(req_clean)
+                origins.add(clean_origin)
 
     return list(origins)
 
@@ -452,12 +386,12 @@ def get_webauthn_rp_id(request=None):
         return configured_rp_id.rstrip(".").lower()
 
     if request:
-        req_origin = request.headers.get("Origin")
-        if req_origin:
-            parsed = urlparse(req_origin)
-            if parsed.hostname:
-                return parsed.hostname
-    return getattr(settings, "WEBAUTHN_RP_ID", "localhost")
+        request_origin = request.headers.get("Origin")
+        if request_origin:
+            hostname = urlparse(request_origin).hostname
+            if hostname:
+                return hostname
+    return "localhost"
 
 
 class PasskeyRegistrationOptionsView(APIView):
@@ -469,17 +403,19 @@ class PasskeyRegistrationOptionsView(APIView):
         try:
             existing_credentials = PasskeyCredential.objects.filter(
                 user=user,
-                is_active=True,
             )
-
-            rp_id = get_webauthn_rp_id(request)
-
+            if existing_credentials.exists():
+                return Response(
+                    {"detail": "Only one passkey can be registered per account. Contact an administrator to replace it."},
+                    status=status.HTTP_409_CONFLICT,
+                )
             options = generate_registration_options(
-                rp_id=rp_id,
+                rp_id=get_webauthn_rp_id(request),
                 rp_name=settings.WEBAUTHN_RP_NAME,
                 user_id=str(user.id).encode("utf-8"),
                 user_name=user.username,
-                user_display_name=(user.get_full_name() or user.username),
+                user_display_name=user.get_full_name() or user.username,
+                authenticator_attachment=AuthenticatorAttachment.PLATFORM,
                 authenticator_selection=AuthenticatorSelectionCriteria(
                     resident_key=ResidentKeyRequirement.PREFERRED,
                     user_verification=UserVerificationRequirement.PREFERRED,
@@ -492,28 +428,25 @@ class PasskeyRegistrationOptionsView(APIView):
                     for credential in existing_credentials
                 ],
             )
-
             challenge = PasskeyChallenge.objects.create(
                 user=user,
                 challenge=options.challenge,
                 challenge_type="REGISTRATION",
                 expires_at=timezone.now() + timedelta(minutes=5),
             )
-
             return Response({
                 "options": options_to_json(options),
                 "challenge_id": challenge.id,
             })
-
-        except Exception as e:
-            traceback.print_exc()
+        except Exception as exc:
+            logger.exception("Passkey registration options failed.")
             return Response(
                 {
                     "detail": "Passkey registration options failed.",
-                    "error": str(e),
-                    "error_type": type(e).__name__,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                 },
-                status=500,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -522,21 +455,12 @@ class PasskeyRegistrationVerifyView(APIView):
 
     def post(self, request):
         user = request.user
-
         credential = request.data.get("credential")
         challenge_id = request.data.get("challenge_id")
-
         if not credential:
-            return Response(
-                {"detail": "Passkey credential is required."},
-                status=400,
-            )
-
+            return Response({"detail": "Passkey credential is required."}, status=400)
         if not challenge_id:
-            return Response(
-                {"detail": "Registration challenge is required."},
-                status=400,
-            )
+            return Response({"detail": "Registration challenge is required."}, status=400)
 
         try:
             challenge = PasskeyChallenge.objects.get(
@@ -546,72 +470,53 @@ class PasskeyRegistrationVerifyView(APIView):
                 used=False,
             )
         except PasskeyChallenge.DoesNotExist:
-            return Response(
-                {"detail": "Invalid or expired registration challenge."},
-                status=400,
-            )
+            return Response({"detail": "Invalid or expired registration challenge."}, status=400)
 
         if challenge.expires_at < timezone.now():
             challenge.used = True
             challenge.save(update_fields=["used"])
-            return Response(
-                {"detail": "Registration challenge has expired."},
-                status=400,
-            )
+            return Response({"detail": "Registration challenge has expired."}, status=400)
 
-        allowed_origins = get_allowed_webauthn_origins(request)
-        rp_id = get_webauthn_rp_id(request)
-
-        stored_challenge_bytes = bytes(challenge.challenge)
         try:
             verification = verify_registration_response(
                 credential=credential,
-                expected_challenge=stored_challenge_bytes,
-                expected_origin=allowed_origins,
-                expected_rp_id=rp_id,
+                expected_challenge=bytes(challenge.challenge),
+                expected_origin=get_allowed_webauthn_origins(request),
+                expected_rp_id=get_webauthn_rp_id(request),
                 require_user_verification=False,
             )
-        except WebAuthnException as e:
-            traceback.print_exc()
-            print("PASSKEY VERIFY ERROR:", repr(e), flush=True)
+        except WebAuthnException as exc:
+            logger.warning("Passkey registration verification failed: %s", exc)
             return Response(
-                {
-                    "detail": f"Device verification failed: {str(e)}",
-                },
-                status=400,
+                {"detail": f"Device verification failed: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        challenge.used = True
-        challenge.save(update_fields=["used"])
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=user.pk)
+            if PasskeyCredential.objects.filter(user=user).exists():
+                return Response(
+                    {"detail": "Only one passkey can be registered per account. Contact an administrator to replace it."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if PasskeyCredential.objects.filter(
+                credential_id=verification.credential_id
+            ).exists():
+                return Response({"detail": "This passkey is already registered."}, status=400)
 
-        if PasskeyCredential.objects.filter(
-            credential_id=verification.credential_id
-        ).exists():
-            return Response(
-                {"detail": "This passkey is already registered."},
-                status=400,
+            challenge.used = True
+            challenge.save(update_fields=["used"])
+            device_type = getattr(verification, "credential_device_type", None)
+            PasskeyCredential.objects.create(
+                user=user,
+                credential_id=verification.credential_id,
+                public_key=verification.credential_public_key,
+                sign_count=verification.sign_count,
+                device_type=device_type.value if device_type else "platform",
+                backed_up=bool(getattr(verification, "credential_backed_up", False)),
+                device_name=request.data.get("device_name", "My device"),
             )
-
-        device_type = "platform"
-        if hasattr(verification, "credential_device_type") and verification.credential_device_type:
-            device_type = verification.credential_device_type.value
-
-        PasskeyCredential.objects.create(
-            user=user,
-            credential_id=verification.credential_id,
-            public_key=verification.credential_public_key,
-            sign_count=verification.sign_count,
-            device_type=device_type,
-            backed_up=bool(getattr(verification, "credential_backed_up", False)),
-            device_name=request.data.get("device_name", "My device"),
-        )
-
-        return Response(
-            {
-                "detail": "Passkey registered successfully.",
-            },
-            status=201,
-        )
+        return Response({"detail": "Passkey registered successfully."}, status=201)
 
 
 class PasskeyAuthenticationOptionsView(APIView):
@@ -620,18 +525,10 @@ class PasskeyAuthenticationOptionsView(APIView):
     def post(self, request):
         user = request.user
         session_id = request.data.get("session_id")
-
         if not session_id:
-            return Response(
-                {"detail": "Lecture session is required."},
-                status=400,
-            )
+            return Response({"detail": "Lecture session is required."}, status=400)
 
-        credentials = PasskeyCredential.objects.filter(
-            user=user,
-            is_active=True,
-        )
-
+        credentials = PasskeyCredential.objects.filter(user=user, is_active=True)
         if not credentials.exists():
             return Response(
                 {
@@ -650,11 +547,8 @@ class PasskeyAuthenticationOptionsView(APIView):
             used=False,
             expires_at__lt=timezone.now(),
         ).update(used=True)
-
-        rp_id = get_webauthn_rp_id(request)
-
         options = generate_authentication_options(
-            rp_id=rp_id,
+            rp_id=get_webauthn_rp_id(request),
             user_verification=UserVerificationRequirement.PREFERRED,
             allow_credentials=[
                 PublicKeyCredentialDescriptor(
@@ -664,7 +558,6 @@ class PasskeyAuthenticationOptionsView(APIView):
                 for credential in credentials
             ],
         )
-
         challenge = PasskeyChallenge.objects.create(
             user=user,
             challenge=options.challenge,
@@ -672,13 +565,10 @@ class PasskeyAuthenticationOptionsView(APIView):
             session_id=int(session_id),
             expires_at=timezone.now() + timedelta(minutes=5),
         )
-
-        return Response(
-            {
-                "options": options_to_json(options),
-                "challenge_id": challenge.id,
-            }
-        )
+        return Response({
+            "options": options_to_json(options),
+            "challenge_id": challenge.id,
+        })
 
 
 class PasskeyAuthenticationVerifyView(APIView):
@@ -686,21 +576,12 @@ class PasskeyAuthenticationVerifyView(APIView):
 
     def post(self, request):
         user = request.user
-
         credential = request.data.get("credential")
         challenge_id = request.data.get("challenge_id")
-
         if not credential:
-            return Response(
-                {"detail": "Passkey credential is required."},
-                status=400,
-            )
-
+            return Response({"detail": "Passkey credential is required."}, status=400)
         if not challenge_id:
-            return Response(
-                {"detail": "Authentication challenge is required."},
-                status=400,
-            )
+            return Response({"detail": "Authentication challenge is required."}, status=400)
 
         try:
             challenge = PasskeyChallenge.objects.get(
@@ -710,33 +591,20 @@ class PasskeyAuthenticationVerifyView(APIView):
                 used=False,
             )
         except PasskeyChallenge.DoesNotExist:
-            return Response(
-                {"detail": "Invalid or expired authentication challenge."},
-                status=400,
-            )
+            return Response({"detail": "Invalid or expired authentication challenge."}, status=400)
 
         if challenge.expires_at < timezone.now():
             challenge.used = True
             challenge.save(update_fields=["used"])
-            return Response(
-                {"detail": "Authentication challenge has expired."},
-                status=400,
-            )
+            return Response({"detail": "Authentication challenge has expired."}, status=400)
 
-        credential_id_str = credential.get("id") or credential.get("rawId")
-        if not credential_id_str:
-            return Response(
-                {"detail": "Passkey credential ID is missing."},
-                status=400,
-            )
-
+        credential_id = credential.get("id") or credential.get("rawId")
+        if not credential_id:
+            return Response({"detail": "Passkey credential ID is missing."}, status=400)
         try:
-            credential_id_bytes = base64url_to_bytes(credential_id_str)
+            credential_id_bytes = base64url_to_bytes(credential_id)
         except Exception:
-            return Response(
-                {"detail": "Invalid passkey credential ID."},
-                status=400,
-            )
+            return Response({"detail": "Invalid passkey credential ID."}, status=400)
 
         try:
             passkey = PasskeyCredential.objects.get(
@@ -745,97 +613,61 @@ class PasskeyAuthenticationVerifyView(APIView):
                 is_active=True,
             )
         except PasskeyCredential.DoesNotExist:
-            return Response(
-                {"detail": "This passkey is not registered to your account."},
-                status=400,
-            )
+            return Response({"detail": "This passkey is not registered to your account."}, status=400)
 
-        allowed_origins = get_allowed_webauthn_origins(request)
-        rp_id = get_webauthn_rp_id(request)
-
-        auth_challenge_bytes = bytes(challenge.challenge)
         try:
             verification = verify_authentication_response(
                 credential=credential,
-                expected_challenge=auth_challenge_bytes,
-                expected_origin=allowed_origins,
-                expected_rp_id=rp_id,
+                expected_challenge=bytes(challenge.challenge),
+                expected_origin=get_allowed_webauthn_origins(request),
+                expected_rp_id=get_webauthn_rp_id(request),
                 credential_public_key=bytes(passkey.public_key),
                 credential_current_sign_count=passkey.sign_count,
                 require_user_verification=False,
             )
-        except WebAuthnException as e:
-            traceback.print_exc()
-            print("PASSKEY AUTH VERIFY ERROR:", repr(e), flush=True)
-            return Response(
-                {
-                    "detail": f"Device verification failed: {str(e)}",
-                },
-                status=400,
-            )
+        except WebAuthnException as exc:
+            logger.warning("Passkey authentication verification failed: %s", exc)
+            return Response({"detail": f"Device verification failed: {exc}"}, status=400)
 
         challenge.used = True
         challenge.save(update_fields=["used"])
-
         passkey.sign_count = verification.new_sign_count
         passkey.last_used_at = timezone.now()
-        if hasattr(verification, "credential_device_type") and verification.credential_device_type:
-            passkey.device_type = verification.credential_device_type.value
-        if hasattr(verification, "credential_backed_up"):
-            passkey.backed_up = verification.credential_backed_up
-        passkey.save(
-            update_fields=[
-                "sign_count",
-                "last_used_at",
-                "device_type",
-                "backed_up",
-            ]
-        )
-
+        device_type = getattr(verification, "credential_device_type", None)
+        if device_type:
+            passkey.device_type = device_type.value
+        passkey.backed_up = bool(getattr(verification, "credential_backed_up", False))
+        passkey.save(update_fields=["sign_count", "last_used_at", "device_type", "backed_up"])
         grant = AttendancePasskeyGrant.objects.create(
             user=user,
             session_id=challenge.session_id,
             expires_at=timezone.now() + timedelta(minutes=5),
         )
-
-        return Response(
-            {
-                "detail": "Passkey verification successful.",
-                "verified": True,
-                "attendance_grant": str(grant.token),
-            },
-            status=200,
-        )
+        return Response({
+            "detail": "Passkey verification successful.",
+            "verified": True,
+            "attendance_grant": str(grant.token),
+        })
 
 
 class PasskeyStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        passkeys = PasskeyCredential.objects.filter(user=user, is_active=True).order_by("-created_at")
-        data = [
-            {
-                "id": pk.id,
-                "device_name": pk.device_name or "Registered passkey",
-                "device_type": pk.device_type,
-                "created_at": pk.created_at,
-                "last_used_at": pk.last_used_at,
-            }
-            for pk in passkeys
-        ]
+        passkeys = PasskeyCredential.objects.filter(
+            user=request.user,
+            is_active=True,
+        ).order_by("-created_at")
         return Response({
             "has_passkey": passkeys.exists(),
-            "passkeys": data,
-        })
-
-    def delete(self, request, pk=None):
-        user = request.user
-        if pk:
-            count, _ = PasskeyCredential.objects.filter(user=user, id=pk).delete()
-        else:
-            count, _ = PasskeyCredential.objects.filter(user=user).delete()
-        return Response({
-            "detail": "Passkey removed successfully.",
-            "deleted_count": count,
+            "passkeys": [
+                {
+                    "id": passkey.id,
+                    "device_name": passkey.device_name or "Registered passkey",
+                    "device_type": passkey.device_type,
+                    "created_at": passkey.created_at,
+                    "last_used_at": passkey.last_used_at,
+                }
+                for passkey in passkeys
+            ],
         })

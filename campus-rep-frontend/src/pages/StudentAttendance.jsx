@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
-import { authenticatePasskeyForSession } from "../utils/passkey";
 
 function RefreshIcon() {
   return (
@@ -95,22 +94,42 @@ function StudentAttendance() {
   const requestLocation = (onSuccess, onFailure) => {
     setLocationStatus("requesting");
 
+    if (window.isSecureContext === false) {
+      setLocationStatus("insecure");
+      onFailure({ code: 4, insecureContext: true });
+      return;
+    }
+
     if (!navigator.geolocation) {
       setLocationStatus("unsupported");
       onFailure({ code: 0 });
       return;
     }
 
+    const acceptPosition = (position) => {
+      setLocationStatus("allowed");
+      onSuccess(position);
+    };
+    const fail = (locationError) => {
+      setLocationStatus(locationError.code === 1 ? "denied" : "idle");
+      onFailure(locationError);
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocationStatus("allowed");
-        onSuccess(position);
-      },
+      acceptPosition,
       (locationError) => {
-        setLocationStatus(locationError.code === 1 ? "denied" : "idle");
-        onFailure(locationError);
+        if (locationError.code === 1) {
+          fail(locationError);
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          acceptPosition,
+          fail,
+          { enableHighAccuracy: false, timeout: 30000, maximumAge: 15000 },
+        );
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 },
     );
   };
 
@@ -128,28 +147,22 @@ function StudentAttendance() {
     requestLocation(
       async (position) => {
         try {
-          setMessage("Verifying your passkey on this device...");
-          const attendanceGrant = await authenticatePasskeyForSession(id);
-
-          setMessage("Submitting attendance check-in...");
           const response = await api.post(
             `/attendance/sessions/${id}/checkin/`,
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
-              attendance_grant: attendanceGrant,
             },
           );
 
           setMessage(response.data.detail || "Successfully checked in!");
+
           await loadSessions();
         } catch (requestError) {
-          setMessage("");
-          const detail =
+          setError(
             requestError.response?.data?.detail ||
-            requestError.message ||
-            "Check-in failed. Ensure you are physically inside the lecture hall.";
-          setError(detail);
+              "Check-in failed. Ensure you are physically inside the lecture hall.",
+          );
         } finally {
           setChecking(null);
         }
@@ -158,12 +171,18 @@ function StudentAttendance() {
         let locationMessage =
           "Location access is required for attendance check-in.";
 
-        if (locationError.code === 1) {
+        if (locationError.insecureContext) {
+          locationMessage =
+            "Your phone browser blocks location on this connection. Open CampusPulse using its secure HTTPS address, then allow location for the site.";
+        } else if (locationError.code === 1) {
           locationMessage =
             "Location permission was denied. Use your browser site settings to allow location, then try again.";
         } else if (locationError.code === 2) {
           locationMessage =
             "Unable to determine your location. Turn on your device location and try again.";
+        } else if (locationError.code === 3) {
+          locationMessage =
+            "Your phone did not return a location in time. Keep location services on and try again near an open area.";
         } else if (locationError.code === 0) {
           locationMessage = "Location is not supported by your browser.";
         }
@@ -236,25 +255,6 @@ function StudentAttendance() {
               <p>
                 Add your matric number, WhatsApp number, and class
                 representative code in your profile first. <Link to="/profile">Complete your profile</Link>
-              </p>
-            </div>
-          </div>
-        )}
-
-        {profile && profile.registration_completed && profile.has_passkey === false && (
-          <div className="cp-attendance-feedback error" role="status">
-            <span className="cp-attendance-feedback-icon">
-              <ShieldIcon />
-            </span>
-
-            <div>
-              <strong>Passkey required for attendance</strong>
-
-              <p>
-                CampusPulse requires biometric or device PIN passkey verification before marking attendance.{" "}
-                <Link to="/security" style={{ fontWeight: 600, textDecoration: "underline" }}>
-                  Set up your passkey in Security settings
-                </Link>
               </p>
             </div>
           </div>

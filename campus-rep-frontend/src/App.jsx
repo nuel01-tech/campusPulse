@@ -22,6 +22,8 @@ import Notifications from "./pages/Notifications";
 import Documents from "./pages/Documents";
 import Classmates from "./pages/Classmates";
 import AdminDashboard from "./pages/AdminDashboard";
+import LecturerDashboard from "./pages/LecturerDashboard";
+import LecturerDirectory from "./pages/LecturerDirectory";
 
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -181,6 +183,15 @@ function App() {
           }
         />
 
+        <Route
+          path="/student/lecturers"
+          element={
+            <ProtectedRoute allowedRole="STUDENT">
+              <LecturerDirectory role="STUDENT" />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Student fallback */}
         <Route
           path="/student/*"
@@ -237,12 +248,30 @@ function App() {
           }
         />
 
+        <Route
+          path="/rep/lecturers"
+          element={
+            <ProtectedRoute allowedRole="CLASS_REP">
+              <LecturerDirectory role="CLASS_REP" />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Representative fallback */}
         <Route
           path="/rep/*"
           element={
             <ProtectedRoute allowedRole="CLASS_REP">
               <RepDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/lecturer/*"
+          element={
+            <ProtectedRoute allowedRole="LECTURER">
+              <LecturerDashboard />
             </ProtectedRoute>
           }
         />

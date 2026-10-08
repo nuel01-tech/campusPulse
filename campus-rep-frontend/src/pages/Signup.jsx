@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import Seo from "../components/Seo";
+import "./SignupLecturer.css";
 
 function CheckIcon() {
   return (
@@ -58,6 +58,7 @@ function RefreshIcon() {
     </svg>
   );
 }
+
 function Signup() {
   const [form, setForm] = useState({
     firstName: "",
@@ -68,12 +69,15 @@ function Signup() {
     department: "",
     level: "",
   });
+  const [role, setRole] = useState("STUDENT");
+  const [teachingSelections, setTeachingSelections] = useState({});
 
   const [departments, setDepartments] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [retryMessage, setRetryMessage] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const navigate = useNavigate();
@@ -156,6 +160,28 @@ function Signup() {
     }));
   };
 
+  const toggleTeachingDepartment = (departmentId) => {
+    setTeachingSelections((current) => {
+      const next = { ...current };
+      if (Object.prototype.hasOwnProperty.call(next, departmentId)) {
+        delete next[departmentId];
+      } else {
+        next[departmentId] = [];
+      }
+      return next;
+    });
+  };
+
+  const toggleTeachingLevel = (departmentId, level) => {
+    setTeachingSelections((current) => {
+      const selectedLevels = current[departmentId] || [];
+      const nextLevels = selectedLevels.includes(level)
+        ? selectedLevels.filter((item) => item !== level)
+        : [...selectedLevels, level];
+      return { ...current, [departmentId]: nextLevels };
+    });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
 
@@ -163,52 +189,47 @@ function Signup() {
     setSubmitting(true);
 
     try {
-      await api.post("/accounts/signup/", {
+      const payload = {
         username: form.username.trim(),
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        department: form.department,
-        level: form.level,
+        role,
         terms_accepted: termsAccepted,
-      });
+      };
+      if (role === "STUDENT") {
+        payload.department = form.department;
+        payload.level = form.level;
+      } else {
+        payload.teaching_assignments = Object.entries(teachingSelections)
+          .flatMap(([department, levels]) =>
+            levels.map((level) => ({ department, level })),
+          );
+      }
+      await api.post("/accounts/signup/", payload);
 
-      navigate("/login");
+      if (role === "LECTURER") {
+        setSuccessMessage(
+          "Your lecturer account has been submitted for review. You can sign in after an administrator approves your department and teaching levels.",
+        );
+      } else {
+        navigate("/login");
+      }
     } catch (e) {
-      if (!e.response) {
-        setError("Unable to connect to the backend server. Please check if the backend server is running.");
-        return;
-      }
-
       const serverError = e.response?.data;
-      let message = "";
 
-      if (typeof serverError === "string") {
-        message = serverError;
-      } else if (serverError && typeof serverError === "object") {
-        // Look for common specific error fields first or pick the first error key returned by DRF
-        const fieldError =
-          serverError.username?.[0] ||
-          serverError.email?.[0] ||
-          serverError.password?.[0] ||
-          serverError.department?.[0] ||
-          serverError.level?.[0] ||
-          serverError.terms_accepted?.[0] ||
-          serverError.non_field_errors?.[0] ||
-          serverError.detail;
+      const message =
+        serverError?.department?.[0] ||
+        serverError?.username?.[0] ||
+        serverError?.email?.[0] ||
+        serverError?.role?.[0] ||
+        serverError?.teaching_assignments?.[0] ||
+        serverError?.terms_accepted?.[0] ||
+        serverError?.detail ||
+        "Signup failed. Please check your details and class code.";
 
-        if (fieldError) {
-          message = fieldError;
-        } else {
-          const firstKey = Object.keys(serverError)[0];
-          const val = serverError[firstKey];
-          const text = Array.isArray(val) ? val[0] : val;
-          message = text ? `${firstKey.replace('_', ' ')}: ${text}` : "";
-        }
-      }
-
-      setError(message || "Signup failed. Please check your details.");
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -216,17 +237,13 @@ function Signup() {
 
   return (
     <div className="cp-auth-page cp-signup-page">
-      <Seo
-        title="Create Account | CampusPulse"
-        description="Sign up for CampusPulse to check in to lectures with GPS and get department announcements."
-        path="/signup"
-      />
       <aside className="cp-auth-aside">
         <div className="cp-auth-aside-content">
           <Link to="/" className="cp-auth-brand">
             <span className="cp-auth-brand-mark">CP</span>
             <span className="cp-auth-brand-name">CampusPulse</span>
           </Link>
+
           <div className="cp-signup-aside-copy">
             <span className="cp-auth-eyebrow cp-auth-eyebrow-light">
               <span className="cp-auth-eyebrow-dot" />
@@ -306,13 +323,25 @@ function Signup() {
             <h2>Create your account</h2>
 
             <p>
-              Create your account first. You will complete your class details
-              after signing in.
+              {role === "STUDENT"
+                ? "Create your student account, then complete class verification after signing in."
+                : "Choose the departments and levels you teach. An administrator will review your lecturer account before access is enabled."}
             </p>
           </div>
 
+          {successMessage && (
+            <div className="cp-auth-feedback success" role="status">
+              <span className="cp-auth-feedback-icon">✓</span>
+              <div>
+                <strong>Application submitted</strong>
+                <span>{successMessage}</span>
+                <Link to="/login">Go to sign in</Link>
+              </div>
+            </div>
+          )}
+
           {error && (
-            <div className="cp-auth-feedback cp-auth-feedback-error" role="alert">
+            <div className="cp-auth-feedback error" role="alert">
               <span className="cp-auth-feedback-icon">!</span>
 
               <div>
@@ -331,7 +360,11 @@ function Signup() {
 
                 <div>
                   <strong>Personal information</strong>
-                  <span>Use the name associated with your student record.</span>
+                  <span>
+                    {role === "STUDENT"
+                      ? "Use the name associated with your student record."
+                      : "Enter your name as students and administrators should see it."}
+                  </span>
                 </div>
               </div>
 
@@ -390,6 +423,42 @@ function Signup() {
               </div>
             </div>
 
+            <div className="cp-signup-section">
+              <div className="cp-signup-section-heading">
+                <span className="cp-signup-section-icon academic">
+                  <AcademicIcon />
+                </span>
+                <div>
+                  <strong>Account type</strong>
+                  <span>Choose the workspace you need.</span>
+                </div>
+              </div>
+              <div className="cp-signup-role-options" role="radiogroup" aria-label="Account type">
+                {[
+                  ["STUDENT", "Student", "Join your class and check attendance."],
+                  ["LECTURER", "Lecturer", "Manage lecture attendance for your classes."],
+                ].map(([value, label, description]) => (
+                  <label
+                    className={`cp-signup-role-option ${role === value ? "is-selected" : ""}`}
+                    key={value}
+                  >
+                    <input
+                      type="radio"
+                      name="account-role"
+                      value={value}
+                      checked={role === value}
+                      onChange={() => setRole(value)}
+                    />
+                    <span>
+                      <strong>{label}</strong>
+                      <small>{description}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {role === "STUDENT" ? (
             <div className="cp-signup-section">
               <div className="cp-signup-section-heading">
                 <span className="cp-signup-section-icon academic">
@@ -462,6 +531,68 @@ function Signup() {
 
               </div>
             </div>
+            ) : (
+              <div className="cp-signup-section">
+                <div className="cp-signup-section-heading">
+                  <span className="cp-signup-section-icon academic">
+                    <AcademicIcon />
+                  </span>
+                  <div>
+                    <strong>Teaching assignments</strong>
+                    <span>Select every department and level you teach.</span>
+                  </div>
+                </div>
+                {loadingDepartments ? (
+                  <p className="cp-lecturer-signup-help">Loading departments…</p>
+                ) : departments.length === 0 ? (
+                  <div className="cp-auth-feedback error" role="alert">
+                    <span>No departments are available. Please retry.</span>
+                    <button type="button" onClick={() => loadDepartments(false)}>
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div className="cp-lecturer-department-list">
+                    {departments.map((department) => {
+                      const departmentId = String(department.id);
+                      const selected = Object.prototype.hasOwnProperty.call(
+                        teachingSelections,
+                        departmentId,
+                      );
+                      return (
+                        <fieldset className="cp-lecturer-department" key={department.id}>
+                          <label className="cp-lecturer-department-choice">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleTeachingDepartment(departmentId)}
+                            />
+                            <span>
+                              <strong>{department.name}</strong>
+                              <small>{department.faculty || "Department"}</small>
+                            </span>
+                          </label>
+                          {selected && (
+                            <div className="cp-lecturer-level-options">
+                              {["100", "200", "300", "400", "500"].map((level) => (
+                                <label key={level}>
+                                  <input
+                                    type="checkbox"
+                                    checked={teachingSelections[departmentId].includes(level)}
+                                    onChange={() => toggleTeachingLevel(departmentId, level)}
+                                  />
+                                  {level} Level
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </fieldset>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="cp-signup-section">
               <div className="cp-signup-section-heading">
@@ -525,7 +656,7 @@ function Signup() {
             <button
               type="submit"
               className="cp-auth-submit cp-signup-submit"
-              disabled={submitting}
+              disabled={submitting || Boolean(successMessage)}
             >
               {submitting ? (
                 <>
