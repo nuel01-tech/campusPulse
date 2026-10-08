@@ -62,6 +62,7 @@ function Security() {
     passkeys: [],
   });
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeyStatusLoading, setPasskeyStatusLoading] = useState(true);
   const [passkeyError, setPasskeyError] = useState("");
   const [passkeyMessage, setPasskeyMessage] = useState("");
 
@@ -80,6 +81,9 @@ function Security() {
           requestError.response?.data?.detail ||
             "Unable to load passkey status.",
         );
+      })
+      .finally(() => {
+        setPasskeyStatusLoading(false);
       });
   }, []);
 
@@ -341,22 +345,34 @@ function Security() {
               <div>
                 <span className="cp-security-section-label">Attendance security</span>
                 <h2>
-                  {passkeyStatus.has_passkey
+                  {passkeyStatusLoading
+                    ? "Checking your device passkey"
+                    : passkeyStatus.has_passkey
                     ? "Your device passkey"
                     : "Set up a device passkey"}
                 </h2>
                 <p>
-                  {passkeyStatus.has_passkey
+                  {passkeyStatusLoading
+                    ? "Loading the passkey registered to your account."
+                    : passkeyStatus.has_passkey
                     ? "A passkey is already registered for this account. Students cannot remove it or register another one."
                     : "Register one passkey for this account to confirm secure attendance check-ins."}
                 </p>
               </div>
-              <span className={`cp-security-status ${passkeyStatus.has_passkey ? "active" : ""}`}>
+              <span className={`cp-security-status ${passkeyStatus.has_passkey ? "active" : "inactive"}`}>
                 <span />
-                {passkeyStatus.has_passkey ? "Configured" : "Not configured"}
+                {passkeyStatusLoading
+                  ? "Checking"
+                  : passkeyStatus.has_passkey
+                    ? "Configured"
+                    : "Not configured"}
               </span>
             </div>
-            {passkeyStatus.has_passkey ? (
+            {passkeyStatusLoading ? (
+              <p className="cp-security-passkey-device" role="status">
+                Checking passkey status…
+              </p>
+            ) : passkeyStatus.has_passkey ? (
               <p className="cp-security-passkey-device">
                 {passkeyStatus.passkeys?.[0]?.device_name || "Registered device"}
                 {passkeyStatus.passkeys?.[0]?.created_at

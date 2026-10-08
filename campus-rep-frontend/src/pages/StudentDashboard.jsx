@@ -4,7 +4,10 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
-import { authenticatePasskeyForSession } from "../utils/passkey";
+import {
+  authenticatePasskeyForSession,
+  fetchPasskeyStatus,
+} from "../utils/passkey";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -164,6 +167,7 @@ function StudentDashboard() {
   const [stats, setStats] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [noPasskey, setNoPasskey] = useState(false);
   const [checking, setChecking] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -204,67 +208,81 @@ function StudentDashboard() {
     loadData();
   }, []);
 
-  const handleCheckIn = (id) => {
+  const handleCheckIn = async (id) => {
     setChecking(id);
     setError("");
     setMessage("");
+    setNoPasskey(false);
 
-    if (!navigator.geolocation) {
-      setError("Your browser does not support location.");
-      setChecking(null);
-      return;
-    }
+    try {
+      const passkeyStatus = await fetchPasskeyStatus();
+      if (!passkeyStatus.has_passkey) {
+        setNoPasskey(true);
+        return;
+      }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          setMessage("Verifying your passkey on this device...");
-          const attendanceGrant = await authenticatePasskeyForSession(id);
+      if (!navigator.geolocation) {
+        setError("Your browser does not support location.");
+        return;
+      }
 
-          setMessage("Submitting attendance check-in...");
-          const response = await api.post(
-            `/attendance/sessions/${id}/checkin/`,
-            {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              attendance_grant: attendanceGrant,
-            },
-          );
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          },
+        );
+      });
 
-          setMessage(response.data.detail || "Successfully checked in!");
-          await loadData();
-        } catch (e) {
-          setMessage("");
+      setMessage("Verifying your passkey on this device...");
+      const attendanceGrant = await authenticatePasskeyForSession(id);
+
+      setMessage("Submitting attendance check-in...");
+      const response = await api.post(
+        `/attendance/sessions/${id}/checkin/`,
+        {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          attendance_grant: attendanceGrant,
+        },
+      );
+
+      setMessage(response.data.detail || "Successfully checked in!");
+      await loadData();
+    } catch (e) {
+      setMessage("");
+      if (e.response?.data?.no_passkey) {
+        setNoPasskey(true);
+        return;
+      }
+
+      if (typeof e.code === "number") {
+        if (e.code === 1) {
           setError(
-            e.response?.data?.detail ||
-              e.message ||
-              "Check-in failed. Please make sure you are inside the lecture room.",
+            "Location permission denied. Please allow location in your browser settings.",
           );
-        } finally {
-          setChecking(null);
+        } else if (e.code === 2) {
+          setError(
+            "Position unavailable. Please ensure GPS/Location is turned on.",
+          );
+        } else {
+          setError("Could not get your location. Please allow location access.");
         }
-      },
-      (err) => {
-        let locationMessage =
-          "Could not get your location. Please allow location access.";
+        return;
+      }
 
-        if (err.code === 1) {
-          locationMessage =
-            "Location permission denied. Please allow location in your browser settings.";
-        } else if (err.code === 2) {
-          locationMessage =
-            "Position unavailable. Please ensure GPS/Location is turned on.";
-        }
-
-        setError(locationMessage);
-        setChecking(null);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 0,
-      },
-    );
+      setError(
+        e.response?.data?.detail ||
+          e.message ||
+          "Check-in failed. Please make sure you are inside the lecture room.",
+      );
+    } finally {
+      setChecking(null);
+    }
   };
 
   const shareToWhatsApp = (announcement) => {
@@ -328,16 +346,29 @@ function StudentDashboard() {
         </header>
 
         {/* Feedback */}
-        {(message || error) && (
+        {(message || error || noPasskey) && (
           <div
-            className={`cp-student-feedback ${message ? "success" : "error"}`}
-            role="status"
+            className={`cp-student-feedback ${message ? "success" : "error"}${noPasskey ? " no-passkey" : ""}`}
+            role={message ? "status" : "alert"}
           >
             <span className="cp-student-feedback-icon">
               {message ? <CheckIcon /> : "!"}
             </span>
 
-            <span>{message || error}</span>
+            <span>
+              {noPasskey
+                ? "A passkey is required for attendance check-in. Set one up in Security settings first."
+                : message || error}
+            </span>
+            {noPasskey && (
+              <button
+                className="cp-student-feedback-action"
+                onClick={() => navigate("/security")}
+                type="button"
+              >
+                Set up passkey
+              </button>
+            )}
           </div>
         )}
 

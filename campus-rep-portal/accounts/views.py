@@ -33,7 +33,11 @@ from webauthn.helpers.structs import (
 from webauthn.helpers.exceptions import WebAuthnException
 from webauthn.helpers import base64url_to_bytes
 from attendance.models import ClassCode
-from .email import PasswordResetEmailError, send_password_reset_email
+from .email import (
+    PasswordResetEmailError,
+    password_reset_email_is_configured,
+    send_password_reset_email,
+)
 from .models import (
     AttendancePasskeyGrant,
     Department,
@@ -194,7 +198,7 @@ class ForgotPasswordView(APIView):
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173').rstrip('/')
         reset_url = f'{frontend_url}/reset-password/{uid}/{token}'
 
-        if settings.DEBUG and not settings.RESEND_API_KEY:
+        if settings.DEBUG and not password_reset_email_is_configured():
             generic['reset_url'] = reset_url
             return Response(generic)
 

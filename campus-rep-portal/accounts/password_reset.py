@@ -9,7 +9,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from attendance.models import ClassCode
-from .email import PasswordResetEmailError, send_password_reset_email
+from .email import (
+    PasswordResetEmailError,
+    password_reset_email_is_configured,
+    send_password_reset_email,
+)
 from .models import User
 
 
@@ -48,7 +52,7 @@ class ForgotPasswordView(APIView):
         frontend_url = settings.FRONTEND_URL.rstrip("/")
         reset_url = f"{frontend_url}/reset-password/{uid}/{token}"
 
-        if settings.DEBUG and not settings.RESEND_API_KEY:
+        if settings.DEBUG and not password_reset_email_is_configured():
             response_data["reset_url"] = reset_url
             return Response(response_data)
 

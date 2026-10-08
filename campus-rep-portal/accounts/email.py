@@ -1,7 +1,8 @@
 import logging
+import smtplib
 
-import requests
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.utils.html import escape
 
 
@@ -12,13 +13,21 @@ class PasswordResetEmailError(Exception):
     pass
 
 
+def password_reset_email_is_configured():
+    return bool(
+        settings.EMAIL_HOST
+        and settings.EMAIL_HOST_USER
+        and settings.EMAIL_HOST_PASSWORD
+        and settings.DEFAULT_FROM_EMAIL
+    )
+
+
 def send_password_reset_email(recipient, reset_url):
-    api_key = settings.RESEND_API_KEY
-    sender = settings.RESEND_FROM_EMAIL
-    if not api_key:
-        raise PasswordResetEmailError("RESEND_API_KEY is not configured.")
-    if not sender:
-        raise PasswordResetEmailError("RESEND_FROM_EMAIL is not configured.")
+    if not password_reset_email_is_configured():
+        raise PasswordResetEmailError(
+            "Gmail SMTP settings are incomplete. Configure EMAIL_HOST, "
+            "EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, and DEFAULT_FROM_EMAIL."
+        )
 
     text_content = (
         "We received a request to reset your CampusPulse password.\n\n"
@@ -33,22 +42,21 @@ def send_password_reset_email(recipient, reset_url):
     )
 
     try:
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": f"CampusPulse <{sender}>",
-                "to": [recipient],
-                "subject": "Reset your CampusPulse password",
-                "text": text_content,
-                "html": html_content,
-            },
-            timeout=10,
+        message = EmailMultiAlternatives(
+            subject="Reset your CampusPulse password",
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[recipient],
         )
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        logger.exception("Resend password reset email request failed.")
-        raise PasswordResetEmailError("Resend could not send the password reset email.") from exc
+        message.attach_alternative(html_content, "text/html")
+        sent_count = message.send(fail_silently=False)
+    except (OSError, smtplib.SMTPException) as exc:
+        logger.exception("Gmail SMTP password reset email request failed.")
+        raise PasswordResetEmailError(
+            "Gmail SMTP could not send the password reset email."
+        ) from exc
+
+    if sent_count != 1:
+        raise PasswordResetEmailError(
+            "Gmail SMTP did not send the password reset email."
+        )

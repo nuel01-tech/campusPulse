@@ -12780,6 +12780,16 @@ select:focus-visible {
   padding: 22px;
 }
 
+.cp-security-passkey-card {
+  grid-column: 1;
+  padding: 22px;
+}
+
+.cp-security-guidelines {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
 .cp-security-card-header {
   display: flex;
   justify-content: space-between;
@@ -12811,6 +12821,14 @@ select:focus-visible {
   font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.cp-security-status.inactive {
+  color: var(--cp-text-muted, #87958e);
+}
+
+.cp-security-status.inactive > span {
+  background: #aab5af;
 }
 
 .cp-security-form {
@@ -12920,6 +12938,28 @@ select:focus-visible {
   padding: 20px;
 }
 
+.cp-security-passkey-device {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--cp-border, #e1eae5);
+  border-radius: 7px;
+  background: #f8fbf9;
+  color: var(--cp-text-soft, #52645b);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cp-security-passkey-note {
+  margin: 14px 0 0;
+  color: var(--cp-text-muted, #87958e);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.cp-security-passkey-card .cp-security-feedback {
+  margin: 12px 0 0;
+}
+
 .cp-security-guidelines-header {
   display: flex;
   align-items: flex-start;
@@ -13007,10 +13047,17 @@ select:focus-visible {
   .cp-security-layout {
     grid-template-columns: 1fr;
   }
+
+  .cp-security-passkey-card,
+  .cp-security-guidelines {
+    grid-column: 1;
+    grid-row: auto;
+  }
 }
 
 @media (max-width: 520px) {
   .cp-security-password-card,
+  .cp-security-passkey-card,
   .cp-security-guidelines {
     padding: 16px;
   }
@@ -14558,6 +14605,36 @@ select:focus-visible {
   border-color: #ecd0d0;
   background: #fff7f7;
   color: #9b3535;
+}
+
+.cp-student-feedback.no-passkey {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  border-color: #eadcb9;
+  background: #fffaf0;
+  color: #77591f;
+}
+
+.cp-student-feedback.no-passkey .cp-student-feedback-icon {
+  background: rgba(119, 89, 31, 0.12);
+}
+
+.cp-student-feedback-action {
+  min-height: 34px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid #d9c48e;
+  border-radius: 7px;
+  background: #fff;
+  color: #604812;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.cp-student-feedback-action:hover {
+  background: #f7efd9;
 }
 
 .cp-student-feedback-icon {

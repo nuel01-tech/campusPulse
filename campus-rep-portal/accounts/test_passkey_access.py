@@ -31,6 +31,21 @@ class PasskeyAccessTests(TestCase):
         self.assertIn("Only one passkey", response.data["detail"])
         self.assertEqual(PasskeyCredential.objects.filter(user=self.student).count(), 1)
 
+    def test_attendance_passkey_challenge_explains_missing_passkey(self):
+        self.passkey.delete()
+        client = APIClient()
+        client.force_authenticate(self.student)
+
+        response = client.post(
+            "/api/accounts/passkeys/auth/options/",
+            {"session_id": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.data["no_passkey"])
+        self.assertIn("set up a passkey", response.data["detail"].lower())
+
     def test_student_cannot_remove_passkey_using_previous_endpoint(self):
         client = APIClient()
         client.force_authenticate(self.student)

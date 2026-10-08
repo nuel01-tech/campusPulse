@@ -44,17 +44,22 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Password reset email (Resend)
+### Password reset email (Gmail SMTP)
 
-Set these values in the backend `.env` file and as secrets/environment variables on the deployed backend:
+Use a Gmail account to send password-reset messages; a custom domain is not required. Enable 2-Step Verification on the Google account, create a Google App Password, and use that app password (not the normal Gmail password). Set these values in the backend `.env` file and as secrets/environment variables on the deployed backend:
 
 ```dotenv
-RESEND_API_KEY=re_your_resend_api_key
-RESEND_FROM_EMAIL=no-reply@campuspulse.app
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-gmail-address@gmail.com
+EMAIL_HOST_PASSWORD=your-16-character-google-app-password
+DEFAULT_FROM_EMAIL=your-gmail-address@gmail.com
 FRONTEND_URL=https://your-frontend-domain
 ```
 
-Verify the sender domain in Resend before sending live email. Keep the API key private; do not add it to frontend environment variables or commit it to the repository.
+Set `EMAIL_HOST_USER` and `DEFAULT_FROM_EMAIL` to the Gmail address used to create the app password. Keep `EMAIL_HOST_PASSWORD` private: add it only to the backend environment on Render, never to frontend variables or source control. The production settings default to Django's SMTP backend; local development continues to show reset links when SMTP credentials are absent.
 
 ### Frontend
 
