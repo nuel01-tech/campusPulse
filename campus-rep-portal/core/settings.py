@@ -40,7 +40,7 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in config(
         'ALLOWED_HOSTS',
-        default='localhost,127.0.0.1,.railway.app',
+        default='localhost,127.0.0.1,.railway.app,.onrender.com',
     ).split(',')
     if host.strip()
 ]
