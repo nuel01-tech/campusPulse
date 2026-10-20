@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import { authenticatePasskeyForSession } from "../utils/passkey";
 
 function RefreshIcon() {
   return (
@@ -147,11 +148,16 @@ function StudentAttendance() {
     requestLocation(
       async (position) => {
         try {
+          setMessage("Verifying your passkey on this device...");
+          const attendanceGrant = await authenticatePasskeyForSession(id);
+
+          setMessage("Submitting attendance check-in...");
           const response = await api.post(
             `/attendance/sessions/${id}/checkin/`,
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
+              attendance_grant: attendanceGrant,
             },
           );
 
@@ -206,8 +212,8 @@ function StudentAttendance() {
             <h1>Check in to a live class.</h1>
 
             <p>
-              Your GPS location verifies that you are present within the
-              designated lecture venue.
+              Your passkey and GPS location verify that you are present within
+              the designated lecture venue.
             </p>
           </div>
 
@@ -312,7 +318,7 @@ function StudentAttendance() {
               <span>
                 <LocationIcon />
               </span>
-              GPS verified
+              Passkey + GPS verified
             </div>
           </div>
 
@@ -413,17 +419,22 @@ function StudentAttendance() {
 
           <div className="cp-attendance-guide-content">
             <div className="cp-attendance-guide-heading">
-              <strong>How GPS verification works</strong>
+              <strong>How attendance verification works</strong>
               <span>Attendance protection</span>
             </div>
 
             <p>
-              CampusPulse checks your current location against the attendance
-              radius configured for the live session. You must be physically
-              within that area for the check-in to be accepted.
+              CampusPulse confirms your device passkey, then checks your
+              current location against the attendance radius configured for the
+              live session. You must pass both checks to be marked present.
             </p>
 
             <div className="cp-attendance-tips">
+              <span>
+                <CheckIcon />
+                Verify your device passkey
+              </span>
+
               <span>
                 <CheckIcon />
                 Turn on device Location

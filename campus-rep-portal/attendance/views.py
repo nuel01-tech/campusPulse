@@ -9,7 +9,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import HttpResponse, FileResponse
 from django.utils.text import get_valid_filename
-from django.db import models
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models, transaction
+from django.utils import timezone
 from rest_framework import status
 from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
 from .utils import haversine_distance
@@ -19,7 +21,7 @@ from rest_framework.exceptions import ValidationError
 from .models import AuditLog
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
-from accounts.models import LecturerTeachingAssignment, User
+from accounts.models import AttendancePasskeyGrant, LecturerTeachingAssignment, User
 from accounts.push import send_email_to_user, send_push_to_user
 
 
@@ -156,10 +158,54 @@ class CheckInView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        record, created = AttendanceRecord.objects.get_or_create(student=request.user, session=session)
+        grant_token = request.data.get("attendance_grant")
+        if not grant_token:
+            return Response(
+                {
+                    "detail": "Verify your passkey before checking in.",
+                    "passkey_required": True,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if not created:
-            return Response({"detail": "Already checked in."}, status=status.HTTP_400_BAD_REQUEST)
+        # Lock the student row so two parallel requests cannot consume separate
+        # grants and create duplicate attendance records for one student.
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=request.user.pk)
+
+            if AttendanceRecord.objects.filter(
+                student=request.user,
+                session=session,
+            ).exists():
+                return Response(
+                    {"detail": "Already checked in."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                grant = AttendancePasskeyGrant.objects.select_for_update().get(
+                    token=grant_token,
+                    user=request.user,
+                    session_id=session.pk,
+                    used=False,
+                    expires_at__gte=timezone.now(),
+                )
+            except (
+                AttendancePasskeyGrant.DoesNotExist,
+                DjangoValidationError,
+                ValueError,
+            ):
+                return Response(
+                    {
+                        "detail": "Your passkey verification has expired or is not valid for this session. Verify your passkey again.",
+                        "passkey_required": True,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            AttendanceRecord.objects.create(student=request.user, session=session)
+            grant.used = True
+            grant.save(update_fields=["used"])
 
         return Response({"detail": "Checked in successfully.", "distance_meters": int(distance)}, status=status.HTTP_201_CREATED)
 

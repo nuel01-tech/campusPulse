@@ -77,7 +77,10 @@ class PasskeyCredential(models.Model):
         related_name="passkeys",
     )
     credential_id = models.BinaryField(unique=True)
-    public_key = models.BinaryField()
+    # A credential's public key is the cryptographic identity behind the
+    # passkey. Keeping it globally unique prevents a cloned credential from
+    # being enrolled under a second student account with a different ID.
+    public_key = models.BinaryField(unique=True)
     sign_count = models.PositiveIntegerField(default=0)
     device_type = models.CharField(max_length=30, blank=True)
     backed_up = models.BooleanField(default=False)

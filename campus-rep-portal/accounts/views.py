@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.utils import timezone
@@ -32,7 +32,7 @@ from webauthn.helpers.structs import (
 )
 from webauthn.helpers.exceptions import WebAuthnException
 from webauthn.helpers import base64url_to_bytes
-from attendance.models import ClassCode
+from attendance.models import ClassCode, LectureSession
 from .email import (
     PasswordResetEmailError,
     password_reset_email_is_configured,
@@ -422,7 +422,7 @@ class PasskeyRegistrationOptionsView(APIView):
                 authenticator_selection=AuthenticatorSelectionCriteria(
                     authenticator_attachment=AuthenticatorAttachment.PLATFORM,
                     resident_key=ResidentKeyRequirement.PREFERRED,
-                    user_verification=UserVerificationRequirement.PREFERRED,
+                    user_verification=UserVerificationRequirement.REQUIRED,
                 ),
                 exclude_credentials=[
                     PublicKeyCredentialDescriptor(
@@ -487,7 +487,7 @@ class PasskeyRegistrationVerifyView(APIView):
                 expected_challenge=bytes(challenge.challenge),
                 expected_origin=get_allowed_webauthn_origins(request),
                 expected_rp_id=get_webauthn_rp_id(request),
-                require_user_verification=False,
+                require_user_verification=True,
             )
         except WebAuthnException as exc:
             logger.warning("Passkey registration verification failed: %s", exc)
@@ -496,29 +496,61 @@ class PasskeyRegistrationVerifyView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            User.objects.select_for_update().get(pk=user.pk)
-            if PasskeyCredential.objects.filter(user=user).exists():
-                return Response(
-                    {"detail": "Only one passkey can be registered per account. Contact an administrator to replace it."},
-                    status=status.HTTP_409_CONFLICT,
-                )
-            if PasskeyCredential.objects.filter(
-                credential_id=verification.credential_id
-            ).exists():
-                return Response({"detail": "This passkey is already registered."}, status=400)
+        try:
+            with transaction.atomic():
+                User.objects.select_for_update().get(pk=user.pk)
+                try:
+                    locked_challenge = PasskeyChallenge.objects.select_for_update().get(
+                        pk=challenge.pk,
+                        user=user,
+                        challenge_type="REGISTRATION",
+                        used=False,
+                    )
+                except PasskeyChallenge.DoesNotExist:
+                    return Response(
+                        {"detail": "This registration challenge has already been used."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if locked_challenge.expires_at < timezone.now():
+                    locked_challenge.used = True
+                    locked_challenge.save(update_fields=["used"])
+                    return Response(
+                        {"detail": "Registration challenge has expired."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if PasskeyCredential.objects.filter(user=user).exists():
+                    return Response(
+                        {"detail": "Only one passkey can be registered per account. Contact an administrator to replace it."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                if PasskeyCredential.objects.filter(
+                    credential_id=verification.credential_id
+                ).exists():
+                    return Response({"detail": "This passkey is already registered."}, status=400)
+                if PasskeyCredential.objects.filter(
+                    public_key=verification.credential_public_key
+                ).exists():
+                    return Response(
+                        {"detail": "This passkey is already registered to another account."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
-            challenge.used = True
-            challenge.save(update_fields=["used"])
-            device_type = getattr(verification, "credential_device_type", None)
-            PasskeyCredential.objects.create(
-                user=user,
-                credential_id=verification.credential_id,
-                public_key=verification.credential_public_key,
-                sign_count=verification.sign_count,
-                device_type=device_type.value if device_type else "platform",
-                backed_up=bool(getattr(verification, "credential_backed_up", False)),
-                device_name=request.data.get("device_name", "My device"),
+                locked_challenge.used = True
+                locked_challenge.save(update_fields=["used"])
+                device_type = getattr(verification, "credential_device_type", None)
+                PasskeyCredential.objects.create(
+                    user=user,
+                    credential_id=verification.credential_id,
+                    public_key=verification.credential_public_key,
+                    sign_count=verification.sign_count,
+                    device_type=device_type.value if device_type else "platform",
+                    backed_up=bool(getattr(verification, "credential_backed_up", False)),
+                    device_name=request.data.get("device_name", "My device"),
+                )
+        except IntegrityError:
+            return Response(
+                {"detail": "This passkey is already registered to another account."},
+                status=status.HTTP_409_CONFLICT,
             )
         return Response({"detail": "Passkey registered successfully."}, status=201)
 
@@ -531,6 +563,26 @@ class PasskeyAuthenticationOptionsView(APIView):
         session_id = request.data.get("session_id")
         if not session_id:
             return Response({"detail": "Lecture session is required."}, status=400)
+
+        if user.role != "STUDENT":
+            return Response(
+                {"detail": "Only student accounts can verify attendance passkeys."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            session_id = int(session_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "Lecture session is invalid."}, status=400)
+        if not LectureSession.objects.filter(
+            pk=session_id,
+            is_active=True,
+            department=user.department,
+            level=user.level,
+        ).exists():
+            return Response(
+                {"detail": "No active session is available for your class."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         credentials = PasskeyCredential.objects.filter(user=user, is_active=True)
         if not credentials.exists():
@@ -553,7 +605,7 @@ class PasskeyAuthenticationOptionsView(APIView):
         ).update(used=True)
         options = generate_authentication_options(
             rp_id=get_webauthn_rp_id(request),
-            user_verification=UserVerificationRequirement.PREFERRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
             allow_credentials=[
                 PublicKeyCredentialDescriptor(
                     id=bytes(credential.credential_id),
@@ -566,7 +618,7 @@ class PasskeyAuthenticationOptionsView(APIView):
             user=user,
             challenge=options.challenge,
             challenge_type="AUTHENTICATION",
-            session_id=int(session_id),
+            session_id=session_id,
             expires_at=timezone.now() + timedelta(minutes=5),
         )
         return Response({
@@ -627,26 +679,57 @@ class PasskeyAuthenticationVerifyView(APIView):
                 expected_rp_id=get_webauthn_rp_id(request),
                 credential_public_key=bytes(passkey.public_key),
                 credential_current_sign_count=passkey.sign_count,
-                require_user_verification=False,
+                require_user_verification=True,
             )
         except WebAuthnException as exc:
             logger.warning("Passkey authentication verification failed: %s", exc)
             return Response({"detail": f"Device verification failed: {exc}"}, status=400)
 
-        challenge.used = True
-        challenge.save(update_fields=["used"])
-        passkey.sign_count = verification.new_sign_count
-        passkey.last_used_at = timezone.now()
-        device_type = getattr(verification, "credential_device_type", None)
-        if device_type:
-            passkey.device_type = device_type.value
-        passkey.backed_up = bool(getattr(verification, "credential_backed_up", False))
-        passkey.save(update_fields=["sign_count", "last_used_at", "device_type", "backed_up"])
-        grant = AttendancePasskeyGrant.objects.create(
-            user=user,
-            session_id=challenge.session_id,
-            expires_at=timezone.now() + timedelta(minutes=5),
-        )
+        try:
+            with transaction.atomic():
+                User.objects.select_for_update().get(pk=user.pk)
+                locked_challenge = PasskeyChallenge.objects.select_for_update().get(
+                    pk=challenge.pk,
+                    user=user,
+                    challenge_type="AUTHENTICATION",
+                    used=False,
+                )
+                if locked_challenge.expires_at < timezone.now():
+                    locked_challenge.used = True
+                    locked_challenge.save(update_fields=["used"])
+                    return Response(
+                        {"detail": "Authentication challenge has expired."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                locked_passkey = PasskeyCredential.objects.select_for_update().get(
+                    pk=passkey.pk,
+                    user=user,
+                    is_active=True,
+                )
+
+                locked_challenge.used = True
+                locked_challenge.save(update_fields=["used"])
+                locked_passkey.sign_count = verification.new_sign_count
+                locked_passkey.last_used_at = timezone.now()
+                device_type = getattr(verification, "credential_device_type", None)
+                if device_type:
+                    locked_passkey.device_type = device_type.value
+                locked_passkey.backed_up = bool(
+                    getattr(verification, "credential_backed_up", False)
+                )
+                locked_passkey.save(
+                    update_fields=["sign_count", "last_used_at", "device_type", "backed_up"]
+                )
+                grant = AttendancePasskeyGrant.objects.create(
+                    user=user,
+                    session_id=locked_challenge.session_id,
+                    expires_at=timezone.now() + timedelta(minutes=5),
+                )
+        except (PasskeyChallenge.DoesNotExist, PasskeyCredential.DoesNotExist):
+            return Response(
+                {"detail": "This authentication challenge has already been used."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response({
             "detail": "Passkey verification successful.",
             "verified": True,

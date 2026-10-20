@@ -1,10 +1,13 @@
 import json
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import AdminAuditEvent, PasskeyChallenge, PasskeyCredential
+from attendance.models import LectureSession
+
+from .models import AdminAuditEvent, Department, PasskeyChallenge, PasskeyCredential
 
 
 User = get_user_model()
@@ -12,9 +15,25 @@ User = get_user_model()
 
 class PasskeyAccessTests(TestCase):
     def setUp(self):
+        self.department = Department.objects.create(
+            name="Passkey Access Department",
+            faculty="Faculty of Testing",
+        )
         self.student = User.objects.create_user(
             username="student",
             password="StrongPassword123!",
+            role="STUDENT",
+            department=self.department,
+            level="200",
+        )
+        self.session = LectureSession.objects.create(
+            department=self.department,
+            level="200",
+            course_code="PAS 201",
+            venue_name="Passkey Access Hall",
+            latitude=6.83,
+            longitude=3.93,
+            is_active=True,
         )
         self.passkey = PasskeyCredential.objects.create(
             user=self.student,
@@ -32,6 +51,22 @@ class PasskeyAccessTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("Only one passkey", response.data["detail"])
         self.assertEqual(PasskeyCredential.objects.filter(user=self.student).count(), 1)
+
+    def test_passkey_key_material_cannot_be_enrolled_for_another_student(self):
+        other_student = User.objects.create_user(
+            username="other-student",
+            password="StrongPassword123!",
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                PasskeyCredential.objects.create(
+                    user=other_student,
+                    credential_id=b"different-credential-id",
+                    public_key=self.passkey.public_key,
+                )
+
+        self.assertEqual(PasskeyCredential.objects.count(), 1)
 
     @override_settings(
         WEBAUTHN_RP_ID="localhost",
@@ -70,7 +105,7 @@ class PasskeyAccessTests(TestCase):
 
         response = client.post(
             "/api/accounts/passkeys/auth/options/",
-            {"session_id": 1},
+            {"session_id": self.session.pk},
             format="json",
         )
 
