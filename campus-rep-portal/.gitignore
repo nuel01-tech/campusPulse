@@ -6,3 +6,6 @@ __pycache__/
 venv/
 staticfiles/
 media/
+backup_*.json
+campuspulse_backup.json
+campuspulse_backup.sql

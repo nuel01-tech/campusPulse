@@ -28,7 +28,7 @@ class User(AbstractUser):
     )
     role = models.CharField(max_length=20, choices=ROLES, default='STUDENT')
     lecturer_approved = models.BooleanField(default=False)
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
     enable_wakeup_calls = models.BooleanField(default=False)
     push_notifications = models.BooleanField(default=True)
