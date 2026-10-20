@@ -94,7 +94,9 @@ function Signup() {
           setDepartments(parsed);
           setLoadingDepartments(false);
         }
-      } catch {}
+      } catch {
+        // Ignore corrupted cached data and load a fresh department list.
+      }
     } else {
       setLoadingDepartments(true);
     }
@@ -105,7 +107,7 @@ function Signup() {
     }
 
     try {
-      const response = await api.get(`/accounts/departments/?_t=${Date.now()}`);
+      const response = await api.get("/accounts/departments/");
 
       const data = response.data || [];
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
@@ -37,6 +37,8 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState("");
+  const [usersError, setUsersError] = useState("");
+  const [departmentsError, setDepartmentsError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -64,6 +66,11 @@ function AdminDashboard() {
   const [publishingAnnouncement, setPublishingAnnouncement] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [adminActionId, setAdminActionId] = useState(null);
+  const [rosterSessionId, setRosterSessionId] = useState(null);
+  const [sessionRoster, setSessionRoster] = useState([]);
+  const [sessionRosterLoading, setSessionRosterLoading] = useState(false);
+  const [selectedRosterStudentId, setSelectedRosterStudentId] = useState("");
+  const [markingAttendance, setMarkingAttendance] = useState(false);
   const documentInputRef = useRef(null);
 
   const title = useMemo(
@@ -84,7 +91,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
+    Promise.allSettled([
       api.get("/accounts/admin/summary/"),
       api.get("/accounts/admin/departments/"),
       api.get("/accounts/admin/class-codes/"),
@@ -92,24 +99,40 @@ function AdminDashboard() {
       api.get("/accounts/admin/announcements/"),
       api.get("/accounts/admin/documents/"),
       api.get("/accounts/admin/audit/"),
-    ])
-      .then(([summaryResponse, departmentResponse, codeResponse, sessionResponse, announcementResponse, documentResponse, auditResponse]) => {
-        if (cancelled) return;
-        setSummary(summaryResponse.data);
-        setDepartments(departmentResponse.data);
-        setClassCodes(codeResponse.data);
-        setSessions(sessionResponse.data);
-        setAnnouncements(announcementResponse.data);
-        setDocuments(documentResponse.data);
-        setAuditEvents(auditResponse.data);
-        setError("");
-      })
-      .catch((requestError) => {
-        if (!cancelled) {
-          setError(getErrorMessage(requestError, "Unable to load administration data."));
-        }
-      })
-      .finally(() => {
+    ]).then((results) => {
+      if (cancelled) return;
+      const [summary, departments, codes, sessions, announcements, documents, audit] =
+        results;
+      const failures = [];
+      if (summary.status === "fulfilled") setSummary(summary.value.data);
+      else failures.push("summary");
+      if (departments.status === "fulfilled") {
+        setDepartments(departments.value.data);
+        setDepartmentsError("");
+      } else {
+        setDepartmentsError(
+          getErrorMessage(departments.reason, "Unable to load departments."),
+        );
+        failures.push("departments");
+      }
+      if (codes.status === "fulfilled") setClassCodes(codes.value.data);
+      else failures.push("class codes");
+      if (sessions.status === "fulfilled") setSessions(sessions.value.data);
+      else failures.push("sessions");
+      if (announcements.status === "fulfilled") {
+        setAnnouncements(announcements.value.data);
+      } else failures.push("announcements");
+      if (documents.status === "fulfilled") setDocuments(documents.value.data);
+      else failures.push("documents");
+      if (audit.status === "fulfilled") setAuditEvents(audit.value.data);
+      else failures.push("audit history");
+
+      setError(
+        failures.length
+          ? `Some owner data could not be loaded: ${failures.join(", ")}.`
+          : "",
+      );
+    }).finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
@@ -121,11 +144,17 @@ function AdminDashboard() {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setUsersLoading(true);
+      setUsersError("");
       try {
         const response = await api.get("/accounts/admin/users/", {
           params: { search, page, page_size: 50 },
         });
         if (cancelled) return;
+        if (!Array.isArray(response.data.results)) {
+          throw new Error(
+            "The user list response was not in the expected format.",
+          );
+        }
         setUsers(response.data.results);
         setUsersPage({
           count: response.data.count,
@@ -135,6 +164,11 @@ function AdminDashboard() {
         setUserDrafts({});
       } catch (requestError) {
         if (!cancelled) {
+          setUsers([]);
+          setUsersPage({ count: 0, next: null, previous: null });
+          setUsersError(
+            getErrorMessage(requestError, "Unable to load accounts."),
+          );
           setError(getErrorMessage(requestError, "Unable to load accounts."));
         }
       } finally {
@@ -185,15 +219,7 @@ function AdminDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [
-        summaryResponse,
-        departmentResponse,
-        codeResponse,
-        sessionResponse,
-        announcementResponse,
-        documentResponse,
-        auditResponse,
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get("/accounts/admin/summary/"),
         api.get("/accounts/admin/departments/"),
         api.get("/accounts/admin/class-codes/"),
@@ -202,14 +228,37 @@ function AdminDashboard() {
         api.get("/accounts/admin/documents/"),
         api.get("/accounts/admin/audit/"),
       ]);
-      setSummary(summaryResponse.data);
-      setDepartments(departmentResponse.data);
-      setClassCodes(codeResponse.data);
-      setSessions(sessionResponse.data);
-      setAnnouncements(announcementResponse.data);
-      setDocuments(documentResponse.data);
-      setAuditEvents(auditResponse.data);
-      setNotice("Workspace refreshed.");
+      const [summary, departments, codes, sessions, announcements, documents, audit] =
+        results;
+      const failures = [];
+      if (summary.status === "fulfilled") setSummary(summary.value.data);
+      else failures.push("summary");
+      if (departments.status === "fulfilled") {
+        setDepartments(departments.value.data);
+        setDepartmentsError("");
+      } else {
+        setDepartmentsError(
+          getErrorMessage(departments.reason, "Unable to load departments."),
+        );
+        failures.push("departments");
+      }
+      if (codes.status === "fulfilled") setClassCodes(codes.value.data);
+      else failures.push("class codes");
+      if (sessions.status === "fulfilled") setSessions(sessions.value.data);
+      else failures.push("sessions");
+      if (announcements.status === "fulfilled") {
+        setAnnouncements(announcements.value.data);
+      } else failures.push("announcements");
+      if (documents.status === "fulfilled") setDocuments(documents.value.data);
+      else failures.push("documents");
+      if (audit.status === "fulfilled") setAuditEvents(audit.value.data);
+      else failures.push("audit history");
+      setError(
+        failures.length
+          ? `Some owner data could not be loaded: ${failures.join(", ")}.`
+          : "",
+      );
+      if (!failures.length) setNotice("Workspace refreshed.");
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Unable to refresh administration data."));
     } finally {
@@ -414,6 +463,63 @@ function AdminDashboard() {
       setNotice(response.data.detail);
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Unable to end this session."));
+    }
+  };
+
+  const loadSessionRoster = async (session) => {
+    setError("");
+    setNotice("");
+    setRosterSessionId(session.id);
+    setSessionRoster([]);
+    setSelectedRosterStudentId("");
+    setSessionRosterLoading(true);
+    try {
+      const response = await api.get(
+        `/attendance/admin/sessions/${session.id}/roster/`,
+      );
+      setSessionRoster(response.data);
+      setSelectedRosterStudentId(String(response.data[0]?.id || ""));
+    } catch (requestError) {
+      setRosterSessionId(null);
+      setError(
+        getErrorMessage(requestError, "Unable to load this session's roster."),
+      );
+    } finally {
+      setSessionRosterLoading(false);
+    }
+  };
+
+  const markSessionAttendance = async (session) => {
+    if (!selectedRosterStudentId) return;
+    setError("");
+    setNotice("");
+    setMarkingAttendance(true);
+    try {
+      const response = await api.post(
+        `/attendance/classmates/${selectedRosterStudentId}/mark-attendance/`,
+        { session_id: session.id },
+      );
+      setNotice(response.data.detail);
+      if (response.data.created) {
+        const remaining = sessionRoster.filter(
+          (student) => String(student.id) !== selectedRosterStudentId,
+        );
+        setSessionRoster(remaining);
+        setSelectedRosterStudentId(String(remaining[0]?.id || ""));
+        setSessions((current) =>
+          current.map((item) =>
+            item.id === session.id
+              ? { ...item, attendee_count: item.attendee_count + 1 }
+              : item,
+          ),
+        );
+      }
+    } catch (requestError) {
+      setError(
+        getErrorMessage(requestError, "Unable to mark this student present."),
+      );
+    } finally {
+      setMarkingAttendance(false);
     }
   };
 
@@ -631,7 +737,7 @@ function AdminDashboard() {
         <table className="cp-owner-table">
           <thead><tr><th>Account</th><th>Email / matric</th><th>Role</th><th>Department</th><th>Level</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
-            {usersLoading ? <tr><td colSpan="7">Loading accounts…</td></tr> : users.length === 0 ? <tr><td colSpan="7">No users found.</td></tr> : users.map((user) => {
+            {usersLoading ? <tr><td colSpan="7">Loading accounts…</td></tr> : usersError ? <tr><td colSpan="7">{usersError}</td></tr> : users.length === 0 ? <tr><td colSpan="7">No user accounts have been created.</td></tr> : users.map((user) => {
               const draft = userDrafts[user.id] || user;
               return (
                 <tr key={user.id}>
@@ -767,6 +873,11 @@ function AdminDashboard() {
         <div className="cp-owner-panel-heading"><div><span className="cp-owner-eyebrow">Existing records</span><h2>{departments.length} departments</h2></div></div>
         <div className="cp-owner-table-wrap">
           <table className="cp-owner-table"><thead><tr><th>Department name</th><th>Faculty</th><th>Actions</th></tr></thead><tbody>
+            {departmentsError ? (
+              <tr><td colSpan="3">{departmentsError}</td></tr>
+            ) : departments.length === 0 ? (
+              <tr><td colSpan="3">No departments have been created yet. Add one above to make it available for signup and class setup.</td></tr>
+            ) : null}
             {departments.map((department) => {
               const draft = departmentDrafts[department.id] || department;
               return <tr key={department.id}>
@@ -810,7 +921,34 @@ function AdminDashboard() {
     <section className="cp-owner-panel">
       <div className="cp-owner-panel-heading"><div><span className="cp-owner-eyebrow">Attendance</span><h2>{sessions.length} sessions</h2></div></div>
       <div className="cp-owner-table-wrap"><table className="cp-owner-table"><thead><tr><th>Course / venue</th><th>Class</th><th>Attendees</th><th>Status</th><th>Created</th><th>Action</th></tr></thead><tbody>
-        {sessions.map((session) => <tr key={session.id}><td><strong>{session.course_code}</strong><small>{session.venue_name}</small></td><td>{session.department_name}<small>{session.level} Level</small></td><td>{session.attendee_count}</td><td>{session.has_ended ? "Ended" : session.is_active ? "Active" : "Inactive"}</td><td>{new Date(session.created_at).toLocaleString()}</td><td>{session.is_active && !session.has_ended ? <button type="button" className="cp-owner-button cp-owner-button-danger" onClick={() => endSession(session)}>End session</button> : "—"}</td></tr>)}
+        {sessions.map((session) => (
+          <Fragment key={session.id}>
+            <tr><td><strong>{session.course_code}</strong><small>{session.venue_name}</small></td><td>{session.department_name}<small>{session.level} Level</small></td><td>{session.attendee_count}</td><td>{session.has_ended ? "Ended" : session.is_active ? "Active" : "Inactive"}</td><td>{new Date(session.created_at).toLocaleString()}</td><td>{session.is_active && !session.has_ended ? <><button type="button" className="cp-owner-button" onClick={() => loadSessionRoster(session)}>{rosterSessionId === session.id ? "Reload roster" : "Mark attendance"}</button> <button type="button" className="cp-owner-button cp-owner-button-danger" onClick={() => endSession(session)}>End session</button></> : "—"}</td></tr>
+            {rosterSessionId === session.id && (
+              <tr>
+                <td colSpan="6">
+                  {sessionRosterLoading ? "Loading class roster…" : sessionRoster.length === 0 ? "No unmarked active students in this class." : (
+                    <div className="cp-owner-roster-controls">
+                      <label>
+                        Student
+                        <select value={selectedRosterStudentId} onChange={(event) => setSelectedRosterStudentId(event.target.value)}>
+                          {sessionRoster.map((student) => (
+                            <option key={student.id} value={student.id}>
+                              {student.name}{student.matric_number ? ` (${student.matric_number})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button type="button" className="cp-owner-button" disabled={!selectedRosterStudentId || markingAttendance} onClick={() => markSessionAttendance(session)}>
+                        {markingAttendance ? "Marking…" : "Mark present"}
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            )}
+          </Fragment>
+        ))}
         {sessions.length === 0 && <tr><td colSpan="6">No attendance sessions.</td></tr>}
       </tbody></table></div>
       <p className="cp-owner-muted">Ending a session preserves its attendance records. Session deletion is not available here.</p>

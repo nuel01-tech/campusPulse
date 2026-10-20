@@ -79,6 +79,30 @@ class OwnerAdminApiTests(TestCase):
         self.assertTrue(self.student.is_active)
         self.assertEqual(AdminAuditEvent.objects.filter(target_type="User").count(), 2)
 
+    def test_owner_can_load_unfiltered_users_and_departments(self):
+        users = self.client.get("/api/accounts/admin/users/")
+        departments = self.client.get("/api/accounts/admin/departments/")
+
+        self.assertEqual(users.status_code, 200)
+        self.assertEqual(users.data["count"], 2)
+        self.assertEqual(
+            {item["id"] for item in users.data["results"]},
+            {self.owner.pk, self.student.pk},
+        )
+        self.assertEqual(departments.status_code, 200)
+        self.assertEqual(
+            next(
+                item
+                for item in departments.data
+                if item["id"] == self.department.pk
+            ),
+            {
+                "id": self.department.pk,
+                "name": "Computer Science",
+                "faculty": "Science",
+            },
+        )
+
     def test_owner_account_cannot_be_modified_from_user_manager(self):
         response = self.client.patch(
             f"/api/accounts/admin/users/{self.owner.pk}/",

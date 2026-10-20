@@ -33,9 +33,26 @@ class LectureSession(models.Model):
     has_ended = models.BooleanField(default=False)
 
 class AttendanceRecord(models.Model):
+    CHECK_IN_METHODS = (
+        ('SELF', 'Student check-in'),
+        ('REP_MANUAL', 'Class representative mark'),
+    )
+
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     session = models.ForeignKey(LectureSession, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
+    check_in_method = models.CharField(
+        max_length=20,
+        choices=CHECK_IN_METHODS,
+        default='SELF',
+    )
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='manually_marked_attendance',
+    )
 
     class Meta:
         unique_together = ('student', 'session')

@@ -1,3 +1,6 @@
+import logging
+from threading import Thread
+
 from rest_framework import generics, permissions
 from .models import LectureSession
 from rest_framework import serializers
@@ -18,6 +21,77 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from accounts.models import LecturerTeachingAssignment, User
 from accounts.push import send_email_to_user, send_push_to_user
+
+
+logger = logging.getLogger(__name__)
+
+
+def record_audit_event(*, user, action, session):
+    """Record an audit event without making the completed action look failed."""
+    try:
+        AuditLog.objects.create(
+            rep=user,
+            action=action,
+            course_code=session.course_code,
+            venue_name=session.venue_name,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not record %s audit event for session %s: %s",
+            action,
+            session.pk,
+            exc,
+        )
+
+
+def _deliver_external_notifications(students, preference, title, body):
+    """Send optional push/email alerts outside the request-response cycle."""
+    for student in students:
+        try:
+            if not getattr(student, preference):
+                continue
+            try:
+                send_push_to_user(student, title, body[:180])
+            except Exception as exc:
+                logger.warning("Push notification failed for user %s: %s", student.pk, exc)
+            try:
+                send_email_to_user(student, title, body)
+            except Exception as exc:
+                logger.warning("Email notification failed for user %s: %s", student.pk, exc)
+        except Exception as exc:
+            logger.warning("Notification delivery setup failed for user %s: %s", student.pk, exc)
+
+
+def notify_students(*, students, notification_type, title, body, preference):
+    """Create in-app alerts quickly and defer slow third-party delivery.
+
+    SMTP and web-push providers may be slow or unavailable. Those failures must
+    never turn an already-completed session or announcement into an API error.
+    """
+    students = list(students)
+    if not students:
+        return
+
+    try:
+        Notification.objects.bulk_create(
+            [
+                Notification(
+                    user_id=student.pk,
+                    type=notification_type,
+                    title=title,
+                    body=body,
+                )
+                for student in students
+            ]
+        )
+    except Exception as exc:
+        logger.warning("Could not create in-app notifications: %s", exc)
+
+    Thread(
+        target=_deliver_external_notifications,
+        args=(students, preference, title, body),
+        daemon=True,
+    ).start()
 
 class AnnouncementListView(generics.ListAPIView):
     serializer_class = AnnouncementSerializer
@@ -65,10 +139,16 @@ class CheckInView(APIView):
         if student_lat is None or student_lon is None:
             return Response({"detail": "latitude and longitude are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        distance = haversine_distance(
-            float(student_lat), float(student_lon),
-            session.latitude, session.longitude
-        )
+        try:
+            distance = haversine_distance(
+                float(student_lat), float(student_lon),
+                session.latitude, session.longitude,
+            )
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "latitude and longitude must be valid numbers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if distance > session.radius_meters:
             return Response(
@@ -108,7 +188,10 @@ class IsSessionManager(permissions.BasePermission):
 def session_queryset_for_manager(user):
     if user.role == "LECTURER":
         return LectureSession.objects.filter(created_by=user)
-    return LectureSession.objects.filter(department=user.department)
+    return LectureSession.objects.filter(
+        department=user.department,
+        level=user.level,
+    )
 
 
 class LectureSessionCreateView(generics.CreateAPIView):
@@ -135,6 +218,10 @@ class LectureSessionCreateView(generics.CreateAPIView):
                 raise ValidationError(
                     {"department": "Your account is not assigned to a department."}
                 )
+            if level != user.level:
+                raise ValidationError(
+                    {"level": "Class representatives can only create sessions for their own level."}
+                )
 
         session = serializer.save(
             department=department,
@@ -142,35 +229,20 @@ class LectureSessionCreateView(generics.CreateAPIView):
             is_active=False,
             has_ended=False,
         )
-        AuditLog.objects.create(
-            rep=user,
-            action='CREATED',
-            course_code=session.course_code,
-            venue_name=session.venue_name,
-        )
+        record_audit_event(user=user, action='CREATED', session=session)
         students = User.objects.filter(
             department=session.department, level=session.level, role='STUDENT'
         )
-        for student in students.iterator():
-            Notification.objects.create(
-                user=student, type='SESSION',
-                title=f'{session.course_code} session created',
-                body=f'{session.venue_name} · {session.level} Level. Your class rep has created a new attendance session.',
-            )
-            if not student.session_notifications:
-                continue
-            try:
-                send_push_to_user(
-                    student,
-                    f'{session.course_code} session created',
-                    f'New session at {session.venue_name}. Check CampusPulse for details.',
-                )
-                send_email_to_user(
-                    student, f'{session.course_code} session created',
-                    f'Your class rep created a new {session.course_code} session at {session.venue_name}. Open CampusPulse for details.',
-                )
-            except Exception:
-                pass
+        notify_students(
+            students=students,
+            notification_type='SESSION',
+            title=f'{session.course_code} session created',
+            body=(
+                f'{session.venue_name} · {session.level} Level. '
+                'Your class rep has created a new attendance session.'
+            ),
+            preference='session_notifications',
+        )
 class LectureSessionToggleView(APIView):
     permission_classes = [IsSessionManager]
 
@@ -190,47 +262,24 @@ class LectureSessionToggleView(APIView):
             session.is_active = False
             session.has_ended = True
             session.save(update_fields=['is_active', 'has_ended'])
-            AuditLog.objects.create(
-                rep=request.user,
-                action='ENDED',
-                course_code=session.course_code,
-                venue_name=session.venue_name,
-            )
+            record_audit_event(user=request.user, action='ENDED', session=session)
             return Response({'detail': 'Session ended.', 'session': LectureSessionSerializer(session).data})
 
         session.is_active = True
         session.save(update_fields=['is_active'])
-        AuditLog.objects.create(
-            rep=request.user,
-            action='STARTED',
-            course_code=session.course_code,
-            venue_name=session.venue_name,
-        )
+        record_audit_event(user=request.user, action='STARTED', session=session)
         students = User.objects.filter(
             department=session.department,
             level=session.level,
             role='STUDENT',
         )
-        for student in students.iterator():
-            Notification.objects.create(
-                user=student, type='SESSION',
-                title=f'{session.course_code} is now live',
-                body=f'Attendance is open at {session.venue_name}.',
-            )
-            if not student.session_notifications:
-                continue
-            try:
-                send_push_to_user(
-                    student,
-                    f'{session.course_code} is now live',
-                    f'Check in at {session.venue_name} — attendance is open now.',
-                )
-                send_email_to_user(
-                    student, f'{session.course_code} is now live',
-                    f'Attendance is now open at {session.venue_name}. Check in through CampusPulse.',
-                )
-            except Exception as e:
-                print(f"PUSH SEND FAILED: {e}")
+        notify_students(
+            students=students,
+            notification_type='SESSION',
+            title=f'{session.course_code} is now live',
+            body=f'Attendance is open at {session.venue_name}.',
+            preference='session_notifications',
+        )
         return Response({'detail': 'Session started.', 'session': LectureSessionSerializer(session).data})
 
 class AnnouncementCreateView(generics.CreateAPIView):
@@ -247,18 +296,13 @@ class AnnouncementCreateView(generics.CreateAPIView):
         students = User.objects.filter(
             department=announcement.department, level=announcement.level, role='STUDENT'
         )
-        for student in students.iterator():
-            Notification.objects.create(
-                user=student, type='ANNOUNCEMENT',
-                title=announcement.title, body=announcement.body,
-            )
-            if not student.announcement_notifications:
-                continue
-            try:
-                send_push_to_user(student, announcement.title, announcement.body[:180])
-                send_email_to_user(student, announcement.title, announcement.body)
-            except Exception:
-                pass
+        notify_students(
+            students=students,
+            notification_type='ANNOUNCEMENT',
+            title=announcement.title,
+            body=announcement.body,
+            preference='announcement_notifications',
+        )
 
 class ActiveSessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
@@ -330,16 +374,14 @@ class LectureSessionDeleteView(generics.DestroyAPIView):
     permission_classes = [IsClassRep]
 
     def get_queryset(self):
-        return LectureSession.objects.filter(department=self.request.user.department)
+        return LectureSession.objects.filter(
+            department=self.request.user.department,
+            level=self.request.user.level,
+        )
 
     def perform_destroy(self, instance):
-        AuditLog.objects.create(
-            rep=self.request.user,
-            action='DELETED',
-            course_code=instance.course_code,
-            venue_name=instance.venue_name,
-        )
         instance.delete()
+        record_audit_event(user=self.request.user, action='DELETED', session=instance)
 
 class ExportAttendanceView(APIView):
     permission_classes = [IsSessionManager]
@@ -350,7 +392,18 @@ class ExportAttendanceView(APIView):
         except LectureSession.DoesNotExist:
             return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        records = AttendanceRecord.objects.filter(session=session).select_related('student')
+        students = User.objects.filter(
+            role='STUDENT',
+            department=session.department,
+            level=session.level,
+        ).order_by('last_name', 'first_name', 'username')
+        attendance_by_student = {
+            record.student_id: record
+            for record in AttendanceRecord.objects.filter(
+                session=session,
+                student__in=students,
+            ).select_related('marked_by')
+        }
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -364,7 +417,7 @@ class ExportAttendanceView(APIView):
         )
         center = Alignment(horizontal='center')
 
-        ws.merge_cells('A1:B1')
+        ws.merge_cells('A1:F1')
         ws['A1'] = f"{session.course_code} — Attendance Sheet"
         ws['A1'].font = title_font
 
@@ -377,24 +430,49 @@ class ExportAttendanceView(APIView):
         ws.cell(row=header_row, column=1, value="S/N").font = bold
         ws.cell(row=header_row, column=2, value="Full Name").font = bold
         ws.cell(row=header_row, column=3, value="Matric Number").font = bold
+        ws.cell(row=header_row, column=4, value="Attendance").font = bold
+        ws.cell(row=header_row, column=5, value="Time").font = bold
+        ws.cell(row=header_row, column=6, value="Marked by").font = bold
 
-        for col in range(1, 4):
+        for col in range(1, 7):
             ws.cell(row=header_row, column=col).border = thin_border
             ws.cell(row=header_row, column=col).alignment = center
 
         row = header_row + 1
-        for i, record in enumerate(records, start=1):
-            full_name = record.student.get_full_name() or record.student.username
-            matric = record.student.matric_number or "N/A"
+        for i, student in enumerate(students, start=1):
+            record = attendance_by_student.get(student.pk)
+            full_name = student.get_full_name() or student.username
+            matric = student.matric_number or "N/A"
 
             ws.cell(row=row, column=1, value=i).border = thin_border
             ws.cell(row=row, column=2, value=full_name).border = thin_border
             ws.cell(row=row, column=3, value=matric).border = thin_border
+            ws.cell(
+                row=row,
+                column=4,
+                value="Present" if record else "Absent",
+            ).border = thin_border
+            ws.cell(
+                row=row,
+                column=5,
+                value=record.timestamp.strftime('%H:%M:%S') if record else "—",
+            ).border = thin_border
+            marker = (
+                record.marked_by.get_full_name() or record.marked_by.username
+                if record and record.marked_by_id
+                else "Student"
+                if record
+                else "—"
+            )
+            ws.cell(row=row, column=6, value=marker).border = thin_border
             row += 1
 
         ws.column_dimensions['A'].width = 6
         ws.column_dimensions['B'].width = 30
         ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 14
+        ws.column_dimensions['E'].width = 14
+        ws.column_dimensions['F'].width = 24
 
         sig_row = row + 2
         signature = "Lecturer's" if request.user.role == "LECTURER" else "Class Rep's"
@@ -408,6 +486,119 @@ class ExportAttendanceView(APIView):
         wb.save(response)
 
         return response
+
+
+class MarkClassmateAttendanceView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        rep = request.user
+        is_class_rep = rep.role == 'CLASS_REP'
+        if not is_class_rep and not rep.is_superuser:
+            return Response(
+                {"detail": "Only class representatives and administrators can mark attendance."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response(
+                {"detail": "Choose an active attendance session."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sessions = LectureSession.objects.filter(
+            pk=session_id,
+            is_active=True,
+            has_ended=False,
+        )
+        if is_class_rep:
+            sessions = sessions.filter(
+                department=rep.department,
+                level=rep.level,
+            )
+        session = sessions.first()
+        if not session:
+            return Response(
+                {"detail": "That active session is unavailable for your account."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        student = User.objects.filter(
+            pk=pk,
+            role='STUDENT',
+            department=session.department,
+            level=session.level,
+            is_active=True,
+        ).first()
+        if not student:
+            return Response(
+                {"detail": "Active student not found in your class."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        record, created = AttendanceRecord.objects.get_or_create(
+            student=student,
+            session=session,
+            defaults={
+                "check_in_method": "REP_MANUAL",
+                "marked_by": rep,
+            },
+        )
+        return Response(
+            {
+                "detail": (
+                    "Attendance marked present."
+                    if created
+                    else "This student is already marked present for this session."
+                ),
+                "student_id": student.pk,
+                "session_id": session.pk,
+                "created": created,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class AdminSessionRosterView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        if not request.user.is_superuser:
+            return Response(
+                {"detail": "Only administrators can view this class roster."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        session = LectureSession.objects.filter(
+            pk=pk,
+            is_active=True,
+            has_ended=False,
+        ).first()
+        if not session:
+            return Response(
+                {"detail": "Active attendance session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        students = User.objects.filter(
+            role='STUDENT',
+            department=session.department,
+            level=session.level,
+            is_active=True,
+        ).exclude(
+            pk__in=AttendanceRecord.objects.filter(
+                session=session,
+            ).values_list('student_id', flat=True)
+        ).order_by('last_name', 'first_name', 'username')
+        return Response([
+            {
+                "id": student.pk,
+                "name": student.get_full_name() or student.username,
+                "matric_number": student.matric_number or "",
+            }
+            for student in students
+        ])
 
 
 class IsStudentOrRep(permissions.BasePermission):

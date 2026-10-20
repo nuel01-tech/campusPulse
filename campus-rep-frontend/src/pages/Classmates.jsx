@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
@@ -234,7 +234,14 @@ function StudentCard({ person }) {
    Rep card
 ------------------------------------------------------- */
 
-function RepCard({ person, onToggleSuspend, onDeleteAccount }) {
+function RepCard({
+  person,
+  onToggleSuspend,
+  onDeleteAccount,
+  selectedSessionId,
+  onMarkAttendance,
+  markingAttendance,
+}) {
   const isRep = person.role === "CLASS_REP";
 
   const fullName =
@@ -315,6 +322,19 @@ function RepCard({ person, onToggleSuspend, onDeleteAccount }) {
         )}
       </div>
 
+      {!isRep && (
+        <div className="cp-rep-attendance-action">
+          <button
+            type="button"
+            className="cp-small-action cp-small-action-activate"
+            onClick={() => onMarkAttendance(person)}
+            disabled={!selectedSessionId || markingAttendance}
+          >
+            {markingAttendance ? "Marking…" : "Mark present"}
+          </button>
+        </div>
+      )}
+
       <div className="cp-admin-card-actions">
         {whatsappUrl ? (
           <a
@@ -381,6 +401,9 @@ function Classmates() {
   const [error, setError] = useState("");
   const [successNotice, setSuccessNotice] = useState("");
   const [search, setSearch] = useState("");
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [markingStudentId, setMarkingStudentId] = useState(null);
 
   const [suspendModal, setSuspendModal] = useState({
     open: false,
@@ -394,15 +417,18 @@ function Classmates() {
     processing: false,
   });
 
-  const loadClassmates = async () => {
+  const loadClassmates = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [classmatesRes, profileRes] = await Promise.allSettled([
+      const requests = [
         api.get("/accounts/classmates/"),
         api.get("/accounts/profile/"),
-      ]);
+      ];
+      if (isRepRole) requests.push(api.get("/attendance/sessions/active/"));
+      const results = await Promise.allSettled(requests);
+      const [classmatesRes, profileRes, sessionsRes] = results;
 
       if (classmatesRes.status === "fulfilled") {
         const raw = classmatesRes.value.data;
@@ -428,12 +454,29 @@ function Classmates() {
           );
         }
       }
+
+      if (isRepRole && sessionsRes) {
+        if (sessionsRes.status === "fulfilled") {
+          const sessions = sessionsRes.value.data || [];
+          setActiveSessions(sessions);
+          setSelectedSessionId((current) =>
+            sessions.some((session) => String(session.id) === current)
+              ? current
+              : String(sessions[0]?.id || ""),
+          );
+        } else {
+          setError(
+            sessionsRes.reason?.response?.data?.detail ||
+              "Unable to load active attendance sessions.",
+          );
+        }
+      }
     } catch {
       setError("An unexpected error occurred while loading your classmates.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [isRepRole]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -441,7 +484,29 @@ function Classmates() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadClassmates]);
+
+  const handleMarkAttendance = async (student) => {
+    if (!selectedSessionId) return;
+
+    setMarkingStudentId(student.id);
+    setError("");
+    setSuccessNotice("");
+    try {
+      const response = await api.post(
+        `/attendance/classmates/${student.id}/mark-attendance/`,
+        { session_id: selectedSessionId },
+      );
+      setSuccessNotice(response.data.detail);
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "Unable to mark attendance for this student.",
+      );
+    } finally {
+      setMarkingStudentId(null);
+    }
+  };
 
   const handleToggleSuspendConfirm = async () => {
     if (!suspendModal.person) return;
@@ -679,6 +744,36 @@ function Classmates() {
           </div>
         </section>
 
+        {isRepRole && (
+          <section className="cp-directory-attendance-tools">
+            <div>
+              <strong>Manual attendance</strong>
+              <span>
+                Use this only when a student cannot check in from their phone.
+                The mark will appear in the session export.
+              </span>
+            </div>
+            <label>
+              <span>Active class session</span>
+              <select
+                value={selectedSessionId}
+                onChange={(event) => setSelectedSessionId(event.target.value)}
+                disabled={activeSessions.length === 0}
+              >
+                {activeSessions.length === 0 ? (
+                  <option value="">No active sessions</option>
+                ) : (
+                  activeSessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.course_code} · {session.venue_name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+          </section>
+        )}
+
         {/* -------------------------------------------
             Loading
         -------------------------------------------- */}
@@ -749,6 +844,9 @@ function Classmates() {
                       <RepCard
                         key={person.id}
                         person={person}
+                        selectedSessionId={selectedSessionId}
+                        onMarkAttendance={handleMarkAttendance}
+                        markingAttendance={markingStudentId === person.id}
                         onToggleSuspend={(target) =>
                           setSuspendModal({
                             open: true,
@@ -797,6 +895,9 @@ function Classmates() {
                       <RepCard
                         key={person.id}
                         person={person}
+                        selectedSessionId={selectedSessionId}
+                        onMarkAttendance={handleMarkAttendance}
+                        markingAttendance={markingStudentId === person.id}
                         onToggleSuspend={(target) =>
                           setSuspendModal({
                             open: true,

@@ -4,21 +4,106 @@
   gap: 10px;
 }
 
+.cp-signup-page {
+  background:
+    radial-gradient(ellipse at 85% 8%, rgba(22, 134, 90, 0.07), transparent 34%),
+    #f7faf8;
+}
+
+.cp-signup-main {
+  background: transparent;
+}
+
+.cp-signup-form-wrap {
+  width: min(720px, 100%);
+  padding: 38px 32px 48px;
+}
+
+.cp-signup-heading {
+  margin-bottom: 24px;
+}
+
+.cp-signup-heading h2 {
+  font-size: clamp(28px, 3vw, 36px);
+  letter-spacing: -0.04em;
+}
+
+.cp-signup-heading > p {
+  max-width: 540px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.cp-signup-form {
+  gap: 14px;
+}
+
+.cp-signup-section {
+  padding: 21px;
+  border-color: #dfe9e3;
+  border-radius: 14px;
+  box-shadow: 0 5px 20px rgba(17, 55, 37, 0.035);
+}
+
+.cp-signup-section-heading {
+  margin-bottom: 17px;
+}
+
+.cp-signup-section-heading strong {
+  font-size: 13px;
+}
+
+.cp-signup-section-heading div > span {
+  font-size: 11px;
+}
+
+.cp-signup-fields {
+  gap: 14px;
+}
+
+.cp-signup-section .cp-auth-field > span {
+  color: #33473c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cp-signup-section .cp-auth-field input,
+.cp-signup-section .cp-auth-field select {
+  min-height: 46px;
+  border-color: #d5e0d9;
+  border-radius: 8px;
+  background-color: #fff;
+}
+
+.cp-signup-section .cp-auth-field input:focus,
+.cp-signup-section .cp-auth-field select:focus {
+  border-color: var(--cp-green-700);
+  box-shadow: 0 0 0 3px rgba(22, 134, 90, 0.1);
+}
+
 .cp-signup-role-option,
 .cp-lecturer-department-choice {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--cp-border);
-  border-radius: 10px;
-  background: var(--cp-white);
+  gap: 11px;
+  min-height: 74px;
+  padding: 15px;
+  border: 1px solid #dce7e0;
+  border-radius: 11px;
+  background: #fff;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.cp-signup-role-option:hover,
+.cp-lecturer-department-choice:hover {
+  border-color: #a8c8b4;
 }
 
 .cp-signup-role-option.is-selected {
-  border-color: var(--cp-green-800);
-  background: #f3faf5;
+  border-color: var(--cp-green-700);
+  background: #f0f8f3;
+  box-shadow: inset 0 0 0 1px var(--cp-green-700);
 }
 
 .cp-signup-role-option input,
@@ -37,14 +122,14 @@
 .cp-signup-role-option strong,
 .cp-lecturer-department-choice strong {
   color: var(--cp-text);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .cp-signup-role-option small,
 .cp-lecturer-department-choice small {
   color: var(--cp-text-muted);
-  font-size: 10px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .cp-lecturer-department-list {
@@ -57,9 +142,10 @@
   min-width: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--cp-border);
-  border-radius: 10px;
+  border: 1px solid #dce7e0;
+  border-radius: 11px;
   overflow: hidden;
+  background: #fff;
 }
 
 .cp-lecturer-department-choice {
@@ -71,7 +157,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
-  padding: 0 12px 12px;
+  padding: 4px 14px 14px;
 }
 
 .cp-lecturer-level-options label {
@@ -100,9 +186,39 @@
   font-weight: 750;
 }
 
+.cp-signup-terms {
+  margin: 2px 0;
+}
+
+.cp-signup-submit {
+  min-height: 48px;
+  margin-top: 2px;
+  border-radius: 9px;
+}
+
+.cp-signup-page .cp-auth-switch {
+  margin-top: 20px;
+  text-align: center;
+}
+
 @media (max-width: 600px) {
+  .cp-signup-form-wrap {
+    padding: 20px 16px 32px;
+  }
+
+  .cp-signup-section {
+    padding: 16px;
+  }
+
   .cp-signup-role-options,
   .cp-lecturer-department-list {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-signup-role-option,
+  .cp-lecturer-department-choice {
+    transition: none;
   }
 }
