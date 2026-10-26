@@ -14836,6 +14836,42 @@ select:focus-visible {
     background 160ms ease;
 }
 
+.cp-student-live-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.cp-student-location-access {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.cp-student-location-access:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cp-student-location-access:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .cp-student-checkin:hover:not(:disabled) {
   background: #f1f7f3;
   transform: translateY(-1px);
@@ -15574,6 +15610,15 @@ select:focus-visible {
 
   .cp-student-checkin {
     width: 100%;
+  }
+
+  .cp-student-live-actions {
+    width: 100%;
+  }
+
+  .cp-student-location-access,
+  .cp-student-checkin {
+    flex: 1;
   }
 
   .cp-student-stat-grid {
@@ -17623,4 +17668,20 @@ tbody tr:hover {
     border-radius: 13px;
     padding: 16px;
   }
+}
+
+/* Final brand override so the supplied CampusPulse emblem wins over legacy mark styles. */
+.cp-brand-mark,
+.cp-auth-brand-mark,
+.cp-landing-brand-mark,
+.cp-legal-brand-mark {
+  background-color: transparent;
+  background-image: url("/campuspulse-mark.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  border-radius: 0;
+  box-shadow: none;
+  color: transparent;
+  font-size: 0;
 }

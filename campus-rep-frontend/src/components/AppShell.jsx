@@ -134,6 +134,13 @@ function AppShell({ role = "STUDENT", children }) {
   const isRep = role === "CLASS_REP";
   const isLecturer = role === "LECTURER";
   const isAdmin = role === "SUPER_ADMIN";
+  const workspaceName = isAdmin
+    ? "Administrator"
+    : isLecturer
+      ? "Lecturer"
+      : isRep
+        ? "Class Representative"
+        : "Student";
   const registrationProgress = profile
     ? Math.round(
         ((Boolean(profile.matric_number) +
@@ -239,17 +246,14 @@ function AppShell({ role = "STUDENT", children }) {
         ["/rep", "Home", "grid"],
         ["/rep/sessions", "Sessions", "calendar"],
         ["/rep/announcements", "Updates", "megaphone"],
-        ["/rep/activity", "Audit", "clock"],
         ["/rep/classmates", "Classmates", "users"],
-        ["/rep/lecturers", "Lecturers", "user"],
         ["/profile", "Profile", "user"],
       ]
     : [
         ["/student", "Home", "grid"],
         ["/student/attendance", "Check-in", "location"],
         ["/student/announcements", "Updates", "megaphone"],
-        ["/student/classmates", "Classmates", "users"],
-        ["/student/lecturers", "Lecturers", "user"],
+        ["/student/history", "History", "clock"],
         ["/profile", "Profile", "user"],
       ];
 
@@ -373,12 +377,14 @@ function AppShell({ role = "STUDENT", children }) {
           <div>
             <span className="cp-workspace-label">Workspace</span>
 
-            <strong>{isRep ? "Class Representative" : "Student Portal"}</strong>
+            <strong>{workspaceName} portal</strong>
           </div>
         </div>
 
         <nav className="cp-sidebar-nav" aria-label="Main navigation">
           {renderNavGroup("Overview", navigation.overview)}
+          {navigation.management &&
+            renderNavGroup("Management", navigation.management)}
           {renderNavGroup("Community", navigation.community)}
           {renderNavGroup("Account", navigation.account)}
         </nav>
@@ -396,7 +402,7 @@ function AppShell({ role = "STUDENT", children }) {
 
             <span className="cp-user-info">
               <strong>{username}</strong>
-              <small>{isRep ? "Class Representative" : "Student"}</small>
+              <small>{workspaceName}</small>
             </span>
 
             <span className="cp-user-arrow">›</span>
@@ -429,9 +435,7 @@ function AppShell({ role = "STUDENT", children }) {
               <div>
                 <span>Olabisi Onabanjo University</span>
 
-                <strong>
-                  {isRep ? "Representative workspace" : "Student workspace"}
-                </strong>
+                <strong>{workspaceName} workspace</strong>
               </div>
             </div>
           </div>
@@ -463,7 +467,7 @@ function AppShell({ role = "STUDENT", children }) {
 
               <span className="cp-topbar-user">
                 <strong>{username}</strong>
-                <small>{isRep ? "Class Rep" : "Student"}</small>
+                <small>{workspaceName}</small>
               </span>
 
               <span className="cp-profile-chevron">↓</span>
@@ -538,5 +542,4 @@ function AppShell({ role = "STUDENT", children }) {
   );
 }
 
-export { icons };
 export default AppShell;

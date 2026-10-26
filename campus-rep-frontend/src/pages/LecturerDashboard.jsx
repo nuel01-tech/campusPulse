@@ -58,6 +58,8 @@ function LecturerDashboard() {
   };
 
   useEffect(() => {
+    // Fetch the initial server state for this page.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, []);
 

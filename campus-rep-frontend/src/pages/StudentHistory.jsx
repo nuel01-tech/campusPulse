@@ -135,6 +135,8 @@ function StudentHistory() {
   };
 
   useEffect(() => {
+    // Load the student's attendance history from the API.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 

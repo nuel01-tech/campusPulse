@@ -145,14 +145,14 @@ function RepDashboard() {
   const [exportingId, setExportingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
-  let decoded = {};
-
-  try {
-    const token = localStorage.getItem("access");
-    decoded = token ? jwtDecode(token) : {};
-  } catch {
-    decoded = {};
-  }
+  const decoded = (() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token) : {};
+    } catch {
+      return {};
+    }
+  })();
 
   const copyCode = async () => {
     if (!classCode) return;
@@ -210,9 +210,13 @@ function RepDashboard() {
     }
   };
 
+  // This effect performs the initial API load; its callback is intentionally
+  // scoped to the mount because it only uses stable setters and API helpers.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     load();
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const active = sessions.filter((s) => s.is_active).length;
 

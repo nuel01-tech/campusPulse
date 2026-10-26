@@ -54,12 +54,14 @@ function ArrowIcon() {
 function Settings() {
   const [profile, setProfile] = useState(null);
 
-  let user = {};
-
-  try {
-    const token = localStorage.getItem("access");
-    user = token ? jwtDecode(token) : {};
-  } catch {}
+  const user = (() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token) : {};
+    } catch {
+      return { role: "STUDENT" };
+    }
+  })();
 
   const role = user.role === "CLASS_REP" ? "CLASS_REP" : "STUDENT";
 

@@ -93,14 +93,14 @@ function Preferences() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  let role = "STUDENT";
-
-  try {
-    const token = localStorage.getItem("access");
-    role = token ? jwtDecode(token).role : "STUDENT";
-  } catch {
-    role = "STUDENT";
-  }
+  const role = (() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token).role : "STUDENT";
+    } catch {
+      return "STUDENT";
+    }
+  })();
 
   useEffect(() => {
     api

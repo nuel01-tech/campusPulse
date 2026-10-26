@@ -85,6 +85,8 @@ function StudentAttendance() {
   };
 
   useEffect(() => {
+    // Load sessions and account state needed to check in.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSessions();
     api
       .get("/accounts/profile/")

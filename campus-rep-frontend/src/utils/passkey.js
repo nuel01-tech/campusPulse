@@ -46,10 +46,11 @@ export async function registerPasskey(deviceName = "My device") {
   } catch (err) {
     if (err.name === "NotAllowedError") {
       throw new Error(
-        "Passkey setup was cancelled or timed out. Please try again."
+        "Passkey setup was cancelled or timed out. Please try again.",
+        { cause: err },
       );
     }
-    throw new Error(err.message || "Passkey registration failed.");
+    throw new Error(err.message || "Passkey registration failed.", { cause: err });
   }
 
   // 3. Verify registration credential with backend
@@ -91,10 +92,11 @@ export async function authenticatePasskeyForSession(sessionId) {
   } catch (err) {
     if (err.name === "NotAllowedError") {
       throw new Error(
-        "Passkey verification was cancelled. Please try again to check in."
+        "Passkey verification was cancelled. Please try again to check in.",
+        { cause: err },
       );
     }
-    throw new Error(err.message || "Passkey verification failed.");
+    throw new Error(err.message || "Passkey verification failed.", { cause: err });
   }
 
   // 3. Verify signed assertion with backend

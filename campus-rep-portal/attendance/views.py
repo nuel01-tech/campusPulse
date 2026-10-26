@@ -661,7 +661,8 @@ class CampusDocumentListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = CampusDocument.objects.select_related('department', 'uploaded_by')
-        if user.role != 'SUPER_ADMIN':
+        is_site_admin = user.is_superuser or user.role == 'SUPER_ADMIN'
+        if not is_site_admin:
             if not user.department:
                 return queryset.none()
             # Keep academic documents inside the user's department and level.
@@ -678,17 +679,25 @@ class CampusDocumentListCreateView(generics.ListCreateAPIView):
         return queryset
 
     def perform_create(self, serializer):
-        if self.request.user.role not in {'STUDENT', 'CLASS_REP'}:
-            raise ValidationError('Only students and class representatives can upload documents.')
-        if not self.request.user.department or not self.request.user.level:
-            raise ValidationError('Complete your department and level before uploading a document.')
-        level = serializer.validated_data.get('level')
-        if level != self.request.user.level:
-            raise ValidationError({'level': 'You can only upload documents for your current level.'})
-        serializer.save(
-            department=self.request.user.department,
-            uploaded_by=self.request.user,
-        )
+        user = self.request.user
+        is_site_admin = user.is_superuser or user.role == 'SUPER_ADMIN'
+
+        if is_site_admin:
+            department = serializer.validated_data.get('department')
+            level = serializer.validated_data.get('level')
+            if not department or not level:
+                raise ValidationError('Choose a department and level for this document.')
+        else:
+            if user.role not in {'STUDENT', 'CLASS_REP'}:
+                raise ValidationError('Only students, class representatives, and site administrators can upload documents.')
+            if not user.department or not user.level:
+                raise ValidationError('Complete your department and level before uploading a document.')
+            level = serializer.validated_data.get('level')
+            if level != user.level:
+                raise ValidationError({'level': 'You can only upload documents for your current level.'})
+            department = user.department
+
+        serializer.save(department=department, uploaded_by=user)
 
 
 class CampusDocumentDownloadView(APIView):
@@ -700,7 +709,8 @@ class CampusDocumentDownloadView(APIView):
         except CampusDocument.DoesNotExist:
             return Response({'detail': 'Document not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if request.user.role != 'SUPER_ADMIN' and (
+        is_site_admin = request.user.is_superuser or request.user.role == 'SUPER_ADMIN'
+        if not is_site_admin and (
             document.department_id != getattr(request.user.department, 'id', None)
             or document.level != request.user.level
         ):
@@ -794,6 +804,7 @@ class MyHistoryView(generics.ListAPIView):
         sessions = LectureSession.objects.filter(
             department=request.user.department,
             level=request.user.level,
+            has_ended=True,
         ).order_by('-created_at')
 
         attended_ids = set(

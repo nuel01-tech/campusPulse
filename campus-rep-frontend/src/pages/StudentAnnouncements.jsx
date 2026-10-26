@@ -112,6 +112,8 @@ function StudentAnnouncements() {
   };
 
   useEffect(() => {
+    // Load initial announcements from the API.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAnnouncements();
   }, []);
 

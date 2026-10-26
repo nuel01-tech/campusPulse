@@ -153,6 +153,8 @@ function Documents() {
   };
 
   useEffect(() => {
+    // These loaders update state only after their API requests settle.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     Promise.all([loadProfile(), loadDocuments()]).catch(() => {
       setError("Unable to load your document workspace.");
     });

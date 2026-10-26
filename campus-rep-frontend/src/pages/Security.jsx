@@ -66,12 +66,14 @@ function Security() {
   const [passkeyError, setPasskeyError] = useState("");
   const [passkeyMessage, setPasskeyMessage] = useState("");
 
-  let role = "STUDENT";
-
-  try {
-    const token = localStorage.getItem("access");
-    role = token ? jwtDecode(token).role : "STUDENT";
-  } catch {}
+  const role = (() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token).role : "STUDENT";
+    } catch {
+      return "STUDENT";
+    }
+  })();
 
   useEffect(() => {
     fetchPasskeyStatus()

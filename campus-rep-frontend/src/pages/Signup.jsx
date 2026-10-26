@@ -82,6 +82,7 @@ function Signup() {
 
   const navigate = useNavigate();
   const attemptRef = useRef(0);
+  const retryTimeoutRef = useRef(null);
 
   const loadDepartments = async (isAutoRetry = false) => {
     const cached = sessionStorage.getItem("campuspulse_departments");
@@ -131,7 +132,10 @@ function Signup() {
           `Loading departments… retrying (${attemptRef.current}/3)`,
         );
 
-        setTimeout(() => loadDepartments(true), 2500);
+        retryTimeoutRef.current = window.setTimeout(
+          () => loadDepartments(true),
+          2500,
+        );
         return;
       }
 
@@ -151,8 +155,10 @@ function Signup() {
     loadDepartments();
 
     return () => {
-      // No active request cancellation was used by the original flow.
+      window.clearTimeout(retryTimeoutRef.current);
     };
+    // loadDepartments depends only on stable state setters and refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setField = (key, value) => {

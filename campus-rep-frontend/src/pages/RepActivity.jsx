@@ -94,7 +94,7 @@ function RepActivity() {
             </div>
           ) : (
             <div className="cp-activity-list">
-              {logs.map((log, index) => (
+              {logs.map((log) => (
                 <article className="cp-activity-item" key={log.id}>
                   <div className="cp-activity-marker">
                     <span />

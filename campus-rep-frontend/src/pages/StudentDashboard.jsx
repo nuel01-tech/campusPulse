@@ -169,18 +169,20 @@ function StudentDashboard() {
   const [error, setError] = useState("");
   const [noPasskey, setNoPasskey] = useState(false);
   const [checking, setChecking] = useState(null);
+  const [locationStatus, setLocationStatus] = useState("prompt");
+  const [requestingLocation, setRequestingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
 
-  let decoded = {};
-
-  try {
-    const token = localStorage.getItem("access");
-    decoded = token ? jwtDecode(token) : {};
-  } catch {
-    decoded = {};
-  }
+  const decoded = (() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token) : {};
+    } catch {
+      return {};
+    }
+  })();
 
   const loadData = async () => {
     setLoading(true);
@@ -205,8 +207,81 @@ function StudentDashboard() {
   };
 
   useEffect(() => {
+    // Load the dashboard's initial server state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!navigator.permissions?.query) return undefined;
+
+    let permissionStatus;
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((status) => {
+        permissionStatus = status;
+        setLocationStatus(status.state);
+        status.onchange = () => setLocationStatus(status.state);
+      })
+      .catch(() => {});
+
+    return () => {
+      if (permissionStatus) permissionStatus.onchange = null;
+    };
+  }, []);
+
+  const getCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      const error = new Error("Your browser does not support location.");
+      error.code = 0;
+      throw error;
+    }
+
+    const locate = (options) =>
+      new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+
+    try {
+      return await locate({
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 0,
+      });
+    } catch (error) {
+      if (error.code === 1) throw error;
+
+      return locate({
+        enableHighAccuracy: false,
+        timeout: 30000,
+        maximumAge: 15000,
+      });
+    }
+  };
+
+  const requestLocationAccess = async () => {
+    setRequestingLocation(true);
+    setError("");
+
+    try {
+      await getCurrentLocation();
+      setLocationStatus("granted");
+      setMessage("Location access is ready for attendance check-in.");
+    } catch (error) {
+      setLocationStatus(error.code === 1 ? "denied" : "prompt");
+      if (error.code === 1) {
+        setError("Location permission is blocked. Allow it in your browser settings, then try again.");
+      } else if (error.code === 2) {
+        setError("Your location is unavailable. Turn on Location/GPS, then try again.");
+      } else if (error.code === 3) {
+        setError("Location took too long to respond. Move near a window or open area and try again.");
+      } else {
+        setError(error.message || "Unable to request location access.");
+      }
+    } finally {
+      setRequestingLocation(false);
+    }
+  };
 
   const handleCheckIn = async (id) => {
     setChecking(id);
@@ -221,24 +296,10 @@ function StudentDashboard() {
         return;
       }
 
-      if (!navigator.geolocation) {
-        setError("Your browser does not support location.");
-        return;
-      }
+      const position = await getCurrentLocation();
+      setLocationStatus("granted");
 
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 12000,
-            maximumAge: 0,
-          },
-        );
-      });
-
-      setMessage("Verifying your passkey on this device...");
+      setMessage("Confirm this check-in with your registered passkey...");
       const attendanceGrant = await authenticatePasskeyForSession(id);
 
       setMessage("Submitting attendance check-in...");
@@ -263,14 +324,14 @@ function StudentDashboard() {
       if (typeof e.code === "number") {
         if (e.code === 1) {
           setError(
-            "Location permission denied. Please allow location in your browser settings.",
+            "Location permission is blocked. Use Allow location below or update your browser settings.",
           );
         } else if (e.code === 2) {
-          setError(
-            "Position unavailable. Please ensure GPS/Location is turned on.",
-          );
+          setError("Your location is unavailable. Turn on GPS/Location and try again.");
+        } else if (e.code === 3) {
+          setError("Location took too long to respond. Try the Allow location button, then check in again.");
         } else {
-          setError("Could not get your location. Please allow location access.");
+          setError("Your browser could not retrieve a location. Try Allow location again.");
         }
         return;
       }
@@ -316,11 +377,10 @@ function StudentDashboard() {
               {getGreeting()}, {decoded.username || "Student"}
             </span>
 
-            <h1>Welcome back.</h1>
+            <h1>Your overview</h1>
 
             <p>
-              Keep track of your attendance, class updates and course resources
-              from one place.
+              Check attendance, follow class updates, and find course resources.
             </p>
           </div>
 
@@ -335,13 +395,6 @@ function StudentDashboard() {
               {loading ? "Refreshing…" : "Refresh"}
             </button>
 
-            <button
-              className="cp-student-profile-button"
-              onClick={() => navigate("/profile")}
-              type="button"
-            >
-              Profile
-            </button>
           </div>
         </header>
 
@@ -409,12 +462,28 @@ function StudentDashboard() {
                   </div>
                 </div>
 
-                <button
-                  className="cp-student-checkin"
-                  disabled={checking === primarySession.id}
-                  onClick={() => handleCheckIn(primarySession.id)}
-                  type="button"
-                >
+                <div className="cp-student-live-actions">
+                  <button
+                    className="cp-student-location-access"
+                    disabled={requestingLocation}
+                    onClick={requestLocationAccess}
+                    type="button"
+                  >
+                    <LocationIcon size={15} />
+                    {requestingLocation
+                      ? "Checking location…"
+                      : locationStatus === "granted"
+                        ? "Location ready"
+                        : "Allow location"}
+                  </button>
+
+                  <button
+                    className="cp-student-checkin"
+                    aria-label="Confirm with your passkey and check in"
+                    disabled={checking === primarySession.id}
+                    onClick={() => handleCheckIn(primarySession.id)}
+                    type="button"
+                  >
                   {checking === primarySession.id ? (
                     <>
                       <span className="cp-student-button-spinner" />
@@ -426,15 +495,16 @@ function StudentDashboard() {
                       Check in with GPS
                     </>
                   )}
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="cp-student-live-note">
               <LocationIcon size={15} />
               <span>
-                You must be within the lecture venue radius to be marked
-                present.
+                Confirm with your registered passkey and stay within the
+                lecture venue radius to be marked present.
               </span>
             </div>
           </section>

@@ -97,14 +97,14 @@ function Profile() {
 
   const fileRef = useRef(null);
 
-  let role = "STUDENT";
-
-  try {
-    const token = localStorage.getItem("access");
-    role = token ? jwtDecode(token).role : "STUDENT";
-  } catch {
-    role = "STUDENT";
-  }
+  const role = (() => {
+    try {
+      const token = localStorage.getItem("access");
+      return token ? jwtDecode(token).role : "STUDENT";
+    } catch {
+      return "STUDENT";
+    }
+  })();
 
   const loadProfile = async () => {
     try {
@@ -130,6 +130,8 @@ function Profile() {
   };
 
   useEffect(() => {
+    // Fetch the initial profile before enabling profile edits.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfile();
   }, []);
 
