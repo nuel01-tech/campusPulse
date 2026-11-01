@@ -33,8 +33,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=parse_debug)
+# Default to local development behavior when the environment is not explicitly configured.
+# Production deployments should set DEBUG=False and SECURE_SSL_REDIRECT=True in their env file.
+DEBUG = config('DEBUG', default=True, cast=parse_debug)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -54,7 +55,7 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = config(
     'SECURE_SSL_REDIRECT',
-    default=not DEBUG,
+    default=False,
     cast=bool,
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

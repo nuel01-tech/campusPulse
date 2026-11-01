@@ -8,6 +8,14 @@ from attendance.models import ClassCode
 User = get_user_model()
 
 
+class HealthCheckTests(TestCase):
+    def test_health_returns_ok_for_slash_and_no_slash_routes(self):
+        for path in ('/health', '/health/'):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200, path)
+            self.assertEqual(response.json()['status'], 'ok')
+
+
 class SignupRegistrationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
