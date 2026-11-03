@@ -235,7 +235,7 @@ function Signup() {
         serverError?.teaching_assignments?.[0] ||
         serverError?.terms_accepted?.[0] ||
         serverError?.detail ||
-        "Signup failed. Please check your details and class code.";
+        "Signup failed. Please check your details and try again.";
 
       setError(message);
     } finally {
@@ -332,7 +332,7 @@ function Signup() {
 
             <p>
               {role === "STUDENT"
-                ? "Create your student account, then complete class verification after signing in."
+                ? "Create your student account, then add your matriculation and contact details after signing in."
                 : "Choose the departments and levels you teach. An administrator will review your lecturer account before access is enabled."}
             </p>
           </div>
