@@ -36,8 +36,7 @@ class SignupRegistrationTests(TestCase):
         serializer = SignupSerializer(data=data)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-    def test_student_completion_requires_all_three_details(self):
-        ClassCode.objects.create(department=self.department, level='200', code='AB12CD')
+    def test_student_completion_does_not_require_class_code(self):
         student = User.objects.create_user(
             username='student_incomplete',
             password='StrongPass123',
@@ -46,16 +45,9 @@ class SignupRegistrationTests(TestCase):
         )
         self.client.force_authenticate(user=student)
 
-        incomplete = self.client.patch('/api/accounts/update-matric/', {
-            'matric_number': 'CMP/2022/010',
-            'phone_number': '08012345678',
-        }, format='json')
-        self.assertEqual(incomplete.status_code, 400)
-
         complete = self.client.patch('/api/accounts/update-matric/', {
             'matric_number': 'CMP/2022/010',
             'phone_number': '08012345678',
-            'class_code': 'AB12CD',
         }, format='json')
         self.assertEqual(complete.status_code, 200)
         student.refresh_from_db()

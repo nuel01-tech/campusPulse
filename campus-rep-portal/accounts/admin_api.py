@@ -292,10 +292,10 @@ class AdminUserDetailView(APIView):
             ("department" in changes and changes["department"] != user.department)
             or ("level" in changes and changes["level"] != user.level)
         )
-        requires_class_code = is_student_after and (
+        requires_profile_completion = is_student_after and (
             class_scope_changed or user.role != "STUDENT"
         )
-        if requires_class_code:
+        if requires_profile_completion:
             changes["registration_completed"] = False
 
         with transaction.atomic():
@@ -313,8 +313,8 @@ class AdminUserDetailView(APIView):
         user.refresh_from_db()
         return Response({
             "detail": (
-                "Account updated. The student must verify the class code again."
-                if requires_class_code
+                "Account updated. The student must review and complete their profile again."
+                if requires_profile_completion
                 else "Account updated."
             ),
             "user": user_data(user),

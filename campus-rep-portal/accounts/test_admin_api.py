@@ -122,7 +122,7 @@ class OwnerAdminApiTests(TestCase):
         self.assertEqual(response.status_code, 405)
         self.assertTrue(User.objects.filter(pk=self.student.pk).exists())
 
-    def test_student_class_changes_require_class_code_verification_again(self):
+    def test_student_class_changes_require_profile_completion_again(self):
         self.student.registration_completed = True
         self.student.save(update_fields=["registration_completed"])
         other_department = Department.objects.create(
@@ -137,7 +137,7 @@ class OwnerAdminApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("verify the class code again", response.data["detail"])
+        self.assertIn("complete their profile again", response.data["detail"])
         self.student.refresh_from_db()
         self.assertEqual(self.student.department, other_department)
         self.assertFalse(self.student.registration_completed)
@@ -178,12 +178,7 @@ class OwnerAdminApiTests(TestCase):
         self.assertEqual(rotated.data["code"], "NEW123")
         self.assertNotEqual(initial_code, rotated.data["code"])
 
-    def test_class_code_remains_valid_after_department_rename(self):
-        ClassCode.objects.create(
-            department=self.department,
-            level="200",
-            code="AB12CD",
-        )
+    def test_student_can_complete_profile_without_class_code_after_department_rename(self):
         renamed = self.client.patch(
             f"/api/accounts/admin/departments/{self.department.pk}/",
             {"name": "Computer Science (weekdays)", "faculty": "Science"},
@@ -198,7 +193,6 @@ class OwnerAdminApiTests(TestCase):
                 "matric_number": "CSC/2024/001",
                 "phone_number": "08012345678",
                 "level": "200",
-                "class_code": "ab12cd",
             },
             format="json",
         )
