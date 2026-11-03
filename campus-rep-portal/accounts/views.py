@@ -97,22 +97,16 @@ class UpdateMatricView(APIView):
         user = request.user
         matric_number = (request.data.get('matric_number') or '').strip()
         level = request.data.get('level')
-        class_code = (request.data.get('class_code') or '').strip().upper()
         phone_number = (request.data.get('phone_number') or '').strip()
 
         if user.role == 'STUDENT':
-            if not matric_number or not phone_number or not class_code:
+            if not matric_number or not phone_number:
                 return Response(
-                    {'detail': 'Matric number, WhatsApp number, and class representative code are required to complete registration.'},
+                    {'detail': 'Matric number and WhatsApp number are required to complete registration.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             selected_level = level or user.level
-            expected_code = ClassCode.objects.filter(
-                department=user.department, level=selected_level
-            ).first()
-            if not expected_code or expected_code.code.upper() != class_code:
-                return Response({'detail': 'Invalid class code for the selected level.'}, status=status.HTTP_400_BAD_REQUEST)
 
             user.matric_number = matric_number
             user.phone_number = phone_number
