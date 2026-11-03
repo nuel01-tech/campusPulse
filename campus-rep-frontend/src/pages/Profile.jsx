@@ -80,7 +80,6 @@ function Profile() {
     matric_number: "",
     phone_number: "",
     level: "",
-    class_code: "",
     first_name: "",
     last_name: "",
   });
@@ -116,7 +115,6 @@ function Profile() {
         matric_number: r.data.matric_number || "",
         phone_number: r.data.phone_number || "",
         level: r.data.level || "",
-        class_code: "",
         first_name: r.data.first_name || "",
         last_name: r.data.last_name || "",
       });
@@ -155,7 +153,6 @@ function Profile() {
         matric_number: form.matric_number.trim(),
         phone_number: form.phone_number.trim(),
         level: form.level,
-        class_code: form.class_code.trim().toUpperCase(),
       });
 
       setMessage(r.data.detail || "Profile details updated successfully.");
@@ -648,24 +645,6 @@ function Profile() {
                     </select>
                   </label>
 
-                  <label>
-                    Class signup code
-                    <input
-                      value={form.class_code}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          class_code: e.target.value.toUpperCase(),
-                        })
-                      }
-                      maxLength={6}
-                      placeholder="Enter your class code"
-                      required
-                    />
-                    <span className="cp-field-hint">
-                      Required to complete registration and unlock attendance.
-                    </span>
-                  </label>
                 </div>
               )}
 
