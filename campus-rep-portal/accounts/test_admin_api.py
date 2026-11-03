@@ -122,7 +122,7 @@ class OwnerAdminApiTests(TestCase):
         self.assertEqual(response.status_code, 405)
         self.assertTrue(User.objects.filter(pk=self.student.pk).exists())
 
-    def test_student_class_changes_require_class_code_verification_again(self):
+    def test_student_class_changes_require_profile_completion_again(self):
         self.student.registration_completed = True
         self.student.save(update_fields=["registration_completed"])
         other_department = Department.objects.create(
