@@ -319,7 +319,7 @@ class WeeklyAttendanceReportView(APIView):
 
     def get(self, request):
         academic_year = (request.query_params.get('academic_year') or '').strip()
-        if academic_year and not re.fullmatch(r'\\d{4}/\\d{4}', academic_year):
+        if academic_year and not re.fullmatch(r'\d{4}/\d{4}', academic_year):
             return Response({'detail': 'Academic year must use the format YYYY/YYYY.'}, status=status.HTTP_400_BAD_REQUEST)
         if not request.user.department or not request.user.level:
             return Response({'detail': 'Your Class Rep account must have a department and level.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -330,7 +330,7 @@ class WeeklyAttendanceReportView(APIView):
         if not user.department or not user.level:
             return Response({'detail': 'Your Class Rep account must have a department and level.'}, status=status.HTTP_400_BAD_REQUEST)
         academic_year = str(request.data.get('academic_year', '')).strip()
-        if not re.fullmatch(r'\\d{4}/\\d{4}', academic_year):
+        if not re.fullmatch(r'\d{4}/\d{4}', academic_year):
             return Response({'academic_year': 'Use the format YYYY/YYYY.'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             week_number = int(request.data.get('week_number'))
@@ -342,6 +342,8 @@ class WeeklyAttendanceReportView(APIView):
             week_start_date = date.fromisoformat(str(request.data.get('week_start_date', '')))
         except (TypeError, ValueError):
             return Response({'week_start_date': 'Provide the Monday date for this week.'}, status=status.HTTP_400_BAD_REQUEST)
+        if week_start_date.weekday() != 0:
+            return Response({'week_start_date': 'The week starting date must be a Monday.'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             register, created = WeeklyAttendanceRegister.objects.get_or_create(
@@ -388,24 +390,37 @@ class WeeklyAttendanceRegisterDetailView(APIView):
         if not isinstance(entries, list) or not entries:
             return Response({'entries': 'Provide at least one student attendance status.'}, status=status.HTTP_400_BAD_REQUEST)
         allowed = {'UNMARKED', 'PRESENT', 'ABSENT', 'EXCUSED'}
+        validated_entries = []
+        seen_student_ids = set()
+        for item in entries:
+            if not isinstance(item, dict):
+                return Response({'entries': 'Each entry must contain student_id and status.'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                student_id = int(item.get('student_id'))
+            except (TypeError, ValueError):
+                return Response({'entries': 'Each entry must contain a valid student_id.'}, status=status.HTTP_400_BAD_REQUEST)
+            status_value = str(item.get('status', '')).upper()
+            if status_value not in allowed:
+                return Response({'entries': f'Invalid attendance status: {status_value}.'}, status=status.HTTP_400_BAD_REQUEST)
+            if student_id in seen_student_ids:
+                return Response({'entries': f'Student {student_id} appears more than once.'}, status=status.HTTP_400_BAD_REQUEST)
+            seen_student_ids.add(student_id)
+            student_exists = User.objects.filter(
+                pk=student_id,
+                role='STUDENT',
+                department=user.department,
+                level=user.level,
+            ).exists()
+            if not student_exists:
+                return Response({'entries': f'Student {student_id} is not in this class.'}, status=status.HTTP_400_BAD_REQUEST)
+            validated_entries.append((student_id, status_value))
+
         with transaction.atomic():
-            for item in entries:
-                if not isinstance(item, dict):
-                    return Response({'entries': 'Each entry must contain student_id and status.'}, status=status.HTTP_400_BAD_REQUEST)
-                try:
-                    student_id = int(item.get('student_id'))
-                except (TypeError, ValueError):
-                    return Response({'entries': 'Each entry must contain a valid student_id.'}, status=status.HTTP_400_BAD_REQUEST)
-                status_value = str(item.get('status', '')).upper()
-                if status_value not in allowed:
-                    return Response({'entries': f'Invalid attendance status: {status_value}.'}, status=status.HTTP_400_BAD_REQUEST)
-                entry = WeeklyAttendanceEntry.objects.filter(
+            for student_id, status_value in validated_entries:
+                entry, _ = WeeklyAttendanceEntry.objects.get_or_create(
                     register=register,
                     student_id=student_id,
-                    student__role='STUDENT',
-                ).first()
-                if not entry:
-                    return Response({'entries': f'Student {student_id} is not in this class register.'}, status=status.HTTP_400_BAD_REQUEST)
+                )
                 entry.status = status_value
                 entry.marked_by = user if status_value != 'UNMARKED' else None
                 entry.save(update_fields=['status', 'marked_by', 'updated_at'])
