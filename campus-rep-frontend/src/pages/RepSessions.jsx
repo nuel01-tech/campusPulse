@@ -61,12 +61,16 @@ function RepSessions() {
     try {
       const r = await api.post(`/attendance/sessions/${session.id}/toggle/`);
 
+      const updatedSession = r.data?.session;
+      if (updatedSession) {
+        setSessions((current) => current.map((item) =>
+          item.id === session.id ? { ...item, ...updatedSession } : item,
+        ));
+      }
       setNotice(
         r.data?.detail ||
           (session.is_active ? "Session ended." : "Session started."),
       );
-
-      await load();
     } catch (e) {
       setError(e.response?.data?.detail || "Unable to update the session.");
     } finally {
@@ -128,8 +132,8 @@ function RepSessions() {
     try {
       await api.delete(`/attendance/sessions/${session.id}/delete/`);
 
+      setSessions((current) => current.filter((item) => item.id !== session.id));
       setNotice("Session deleted.");
-      await load();
     } catch (e) {
       setError(e.response?.data?.detail || "Unable to delete the session.");
     } finally {

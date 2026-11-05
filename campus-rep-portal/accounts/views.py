@@ -98,6 +98,7 @@ class UpdateMatricView(APIView):
         matric_number = (request.data.get('matric_number') or '').strip()
         level = request.data.get('level')
         phone_number = (request.data.get('phone_number') or '').strip()
+        class_code = (request.data.get('class_code') or '').strip().upper()
 
         if user.role == 'STUDENT':
             if not matric_number or not phone_number:
@@ -107,6 +108,24 @@ class UpdateMatricView(APIView):
                 )
 
             selected_level = level or user.level
+
+            # Require the department/level Class Code only for first-time completion.
+            # Existing completed students can continue editing their profile normally.
+            if not user.registration_completed:
+                expected_code = ClassCode.objects.filter(
+                    department=user.department,
+                    level=selected_level,
+                ).first()
+                if not class_code:
+                    return Response(
+                        {'class_code': 'Enter the Class Code supplied by your Class Representative.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if not expected_code or expected_code.code.upper() != class_code:
+                    return Response(
+                        {'class_code': 'The Class Code is incorrect or has not been configured for your department and level.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             user.matric_number = matric_number
             user.phone_number = phone_number
@@ -570,6 +589,7 @@ class PasskeyAuthenticationOptionsView(APIView):
         if not LectureSession.objects.filter(
             pk=session_id,
             is_active=True,
+            has_ended=False,
             department=user.department,
             level=user.level,
         ).exists():

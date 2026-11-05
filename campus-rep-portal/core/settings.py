@@ -35,7 +35,7 @@ SECRET_KEY = config('SECRET_KEY')
 
 # Default to local development behavior when the environment is not explicitly configured.
 # Production deployments should set DEBUG=False and SECURE_SSL_REDIRECT=True in their env file.
-DEBUG = config('DEBUG', default=True, cast=parse_debug)
+DEBUG = config('DEBUG', default=False, cast=parse_debug)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -55,7 +55,7 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = config(
     'SECURE_SSL_REDIRECT',
-    default=False,
+    default=not DEBUG,
     cast=bool,
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -161,7 +161,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Lagos'
 
 USE_I18N = True
 
@@ -189,7 +189,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
 VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY').replace('\\n', '\n')
 VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY')
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+FRONTEND_URL = config('FRONTEND_URL', default='https://campus-pulse-gules-iota.vercel.app')
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 EMAIL_BACKEND = config(
@@ -218,6 +218,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://10.83.145.244:5173",
     "https://campusoou.netlify.app",
+    "https://campus-pulse-gules-iota.vercel.app",
 ] + cors_env_origins
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -233,7 +234,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 WEBAUTHN_RP_ID = os.getenv(
     "WEBAUTHN_RP_ID",
-    "localhost" if DEBUG else "campusoou.netlify.app",
+    "localhost" if DEBUG else "campus-pulse-gules-iota.vercel.app",
 )
 
 WEBAUTHN_RP_NAME = os.getenv(
@@ -243,5 +244,5 @@ WEBAUTHN_RP_NAME = os.getenv(
 
 WEBAUTHN_ORIGIN = os.getenv(
     "WEBAUTHN_ORIGIN",
-    "http://localhost:5173",
+    "http://localhost:5173" if DEBUG else "https://campus-pulse-gules-iota.vercel.app",
 )

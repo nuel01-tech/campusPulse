@@ -36,7 +36,7 @@ class SignupRegistrationTests(TestCase):
         serializer = SignupSerializer(data=data)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-    def test_student_completion_does_not_require_class_code(self):
+    def test_student_completion_requires_matching_department_level_class_code(self):
         student = User.objects.create_user(
             username='student_incomplete',
             password='StrongPass123',
@@ -44,14 +44,38 @@ class SignupRegistrationTests(TestCase):
             level='200',
         )
         self.client.force_authenticate(user=student)
-
-        complete = self.client.patch('/api/accounts/update-matric/', {
+        payload = {
             'matric_number': 'CMP/2022/010',
             'phone_number': '08012345678',
-        }, format='json')
+        }
+
+        missing = self.client.patch('/api/accounts/update-matric/', payload, format='json')
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn('class_code', missing.json())
+
+        ClassCode.objects.create(department=self.department, level='200', code='ABC123')
+        incorrect = self.client.patch(
+            '/api/accounts/update-matric/',
+            {**payload, 'class_code': 'WRONG1'},
+            format='json',
+        )
+        self.assertEqual(incorrect.status_code, 400)
+
+        complete = self.client.patch(
+            '/api/accounts/update-matric/',
+            {**payload, 'class_code': 'abc123'},
+            format='json',
+        )
         self.assertEqual(complete.status_code, 200)
         student.refresh_from_db()
         self.assertTrue(student.registration_completed)
+
+        # Existing completed students can edit their details without re-entering the code.
+        update = self.client.patch('/api/accounts/update-matric/', {
+            'matric_number': 'CMP/2022/011',
+            'phone_number': '08012345679',
+        }, format='json')
+        self.assertEqual(update.status_code, 200)
 
 
 class ClassmatesAndManagementTests(TestCase):

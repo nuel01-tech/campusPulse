@@ -1,4 +1,4 @@
-import random
+import secrets
 import string
 
 from django.db import models
@@ -93,7 +93,7 @@ class AuditLog(models.Model):
 
 
 def generate_class_code():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
 
 
 class ClassCode(models.Model):

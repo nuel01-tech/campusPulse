@@ -79,6 +79,7 @@ function Profile() {
   const [form, setForm] = useState({
     matric_number: "",
     phone_number: "",
+    class_code: "",
     level: "",
     first_name: "",
     last_name: "",
@@ -114,6 +115,7 @@ function Profile() {
       setForm({
         matric_number: r.data.matric_number || "",
         phone_number: r.data.phone_number || "",
+        class_code: "",
         level: r.data.level || "",
         first_name: r.data.first_name || "",
         last_name: r.data.last_name || "",
@@ -153,6 +155,9 @@ function Profile() {
         matric_number: form.matric_number.trim(),
         phone_number: form.phone_number.trim(),
         level: form.level,
+        ...(!profile?.registration_completed && role === "STUDENT"
+          ? { class_code: form.class_code.trim().toUpperCase() }
+          : {}),
       });
 
       setMessage(r.data.detail || "Profile details updated successfully.");
@@ -160,8 +165,13 @@ function Profile() {
 
       await loadProfile();
     } catch (e) {
+      const responseErrors = e.response?.data;
       setError(
-        e.response?.data?.detail || "Unable to update your profile details.",
+        responseErrors?.detail ||
+          responseErrors?.class_code ||
+          responseErrors?.matric_number ||
+          responseErrors?.phone_number ||
+          "Unable to update your profile details.",
       );
     } finally {
       setSaving(false);
@@ -287,6 +297,7 @@ function Profile() {
   const image = preview || profile?.profile_picture;
 
   const isRep = role === "CLASS_REP";
+  const isStudent = role === "STUDENT";
 
   const fullName =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
@@ -621,6 +632,24 @@ function Profile() {
                   required={!isRep}
                 />
               </label>
+
+              {isStudent && !profile?.registration_completed && (
+                <label>
+                  Class Code
+                  <input
+                    value={form.class_code}
+                    onChange={(e) =>
+                      setForm({ ...form, class_code: e.target.value.toUpperCase() })
+                    }
+                    placeholder="Enter the 6-character code from your Class Rep"
+                    maxLength={6}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    required
+                  />
+                  <small>Ask your Class Representative for your department and level code.</small>
+                </label>
+              )}
 
               {!isRep && (
                 <div className="cp-profile-level-box">

@@ -26,13 +26,25 @@ function ActivityIcon() {
 function RepActivity() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadActivity = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await api.get("/attendance/audit-log/");
+      setLogs(response.data || []);
+    } catch {
+      setError("Unable to load activity. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api
-      .get("/attendance/audit-log/")
-      .then((r) => setLogs(r.data || []))
-      .catch(() => setLogs([]))
-      .finally(() => setLoading(false));
+    // Load the audit trail when the page opens.
+    // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+    loadActivity();
   }, []);
 
   return (
@@ -78,6 +90,12 @@ function RepActivity() {
           {loading ? (
             <div className="cp-activity-loading">
               <LoadingSkeleton rows={5} />
+            </div>
+          ) : error ? (
+            <div className="cp-activity-empty" role="alert">
+              <h3>Activity could not be loaded</h3>
+              <p>{error}</p>
+              <button type="button" onClick={loadActivity}>Try again</button>
             </div>
           ) : logs.length === 0 ? (
             <div className="cp-activity-empty">

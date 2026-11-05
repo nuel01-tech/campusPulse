@@ -124,7 +124,7 @@ class CheckInView(APIView):
             )
 
         try:
-            session = LectureSession.objects.get(pk=pk, is_active=True)
+            session = LectureSession.objects.get(pk=pk, is_active=True, has_ended=False)
         except LectureSession.DoesNotExist:
             return Response({"detail": "No active session found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -386,6 +386,7 @@ class ActiveSessionsView(generics.ListAPIView):
             department=self.request.user.department,
             level=self.request.user.level,
             is_active=True,
+            has_ended=False,
         ).annotate(student_has_checked_in=Exists(checked_in))
 class MySessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
@@ -401,7 +402,8 @@ class MyStatsView(APIView):
     def get(self, request):
         eligible_sessions = LectureSession.objects.filter(
             department=request.user.department,
-            level=request.user.level
+            level=request.user.level,
+            has_ended=True,
         ).order_by('-created_at')
 
         total_sessions = eligible_sessions.count()
