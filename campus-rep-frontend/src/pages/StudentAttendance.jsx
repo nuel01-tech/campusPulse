@@ -496,7 +496,7 @@ function StudentAttendance() {
                           : ""
                     }`}
                     onClick={() => checkIn(session.id)}
-                    disabled={session.has_checked_in || checking === session.id}
+                    disabled={session.has_checked_in || checking === session.id || profileLoading || Boolean(profileError) || !profile}
                   >
                     {session.has_checked_in ? (
                       <>
