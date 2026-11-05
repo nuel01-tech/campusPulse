@@ -67,6 +67,7 @@ function StudentAttendance() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("info");
   const [profile, setProfile] = useState(null);
   const [locationStatus, setLocationStatus] = useState("idle");
 
@@ -78,7 +79,9 @@ function StudentAttendance() {
       const response = await api.get("/attendance/sessions/active/");
       setSessions(response.data || []);
     } catch {
+      setMessage("");
       setError("Unable to load active sessions.");
+      setFeedbackStatus("error");
     } finally {
       setLoading(false);
     }
@@ -139,6 +142,7 @@ function StudentAttendance() {
   const checkIn = (id) => {
     setError("");
     setMessage("");
+    setFeedbackStatus("info");
 
     if (!profile?.registration_completed) {
       setError("Complete your registration details before checking in.");
@@ -163,14 +167,18 @@ function StudentAttendance() {
             },
           );
 
+          setError("");
           setMessage(response.data.detail || "Successfully checked in!");
+          setFeedbackStatus("success");
 
           await loadSessions();
         } catch (requestError) {
+          setMessage("");
           setError(
             requestError.response?.data?.detail ||
               "Check-in failed. Ensure you are physically inside the lecture hall.",
           );
+          setFeedbackStatus("error");
         } finally {
           setChecking(null);
         }
@@ -195,7 +203,9 @@ function StudentAttendance() {
           locationMessage = "Location is not supported by your browser.";
         }
 
+        setMessage("");
         setError(locationMessage);
+        setFeedbackStatus("error");
         setChecking(null);
       },
     );
@@ -232,18 +242,29 @@ function StudentAttendance() {
 
         {(message || error) && (
           <div
-            className={`cp-attendance-feedback ${
-              message ? "success" : "error"
-            }`}
-            role="status"
+            className={`cp-attendance-feedback ${feedbackStatus}`}
+            role={feedbackStatus === "error" ? "alert" : "status"}
+            aria-live="polite"
           >
             <span className="cp-attendance-feedback-icon">
-              {message ? <CheckIcon /> : <AlertIcon />}
+              {feedbackStatus === "success" ? (
+                <CheckIcon />
+              ) : feedbackStatus === "error" ? (
+                <AlertIcon />
+              ) : (
+                <LocationIcon />
+              )}
             </span>
 
             <div>
               <strong>
-                {message ? "Attendance recorded" : "Check-in issue"}
+                {feedbackStatus === "success"
+                  ? "Attendance recorded"
+                  : feedbackStatus === "error"
+                    ? "Check-in issue"
+                    : checking
+                      ? "Check-in in progress"
+                      : "Information"}
               </strong>
 
               <p>{message || error}</p>
