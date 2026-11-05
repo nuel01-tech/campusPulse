@@ -69,7 +69,27 @@ function StudentAttendance() {
   const [error, setError] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("info");
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
   const [locationStatus, setLocationStatus] = useState("idle");
+
+  const loadProfile = async () => {
+    setProfileLoading(true);
+    setProfileError("");
+
+    try {
+      const response = await api.get("/accounts/profile/");
+      setProfile(response.data);
+    } catch (requestError) {
+      setProfile(null);
+      setProfileError(
+        requestError.response?.data?.detail ||
+          "We couldn't load your account details. Check your connection and try again.",
+      );
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const loadSessions = async () => {
     setLoading(true);
@@ -78,9 +98,12 @@ function StudentAttendance() {
     try {
       const response = await api.get("/attendance/sessions/active/");
       setSessions(response.data || []);
-    } catch {
+    } catch (requestError) {
       setMessage("");
-      setError("Unable to load active sessions.");
+      setError(
+        requestError.response?.data?.detail ||
+          "Unable to load active sessions. Check your connection and try again.",
+      );
       setFeedbackStatus("error");
     } finally {
       setLoading(false);
@@ -91,10 +114,7 @@ function StudentAttendance() {
     // Load sessions and account state needed to check in.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSessions();
-    api
-      .get("/accounts/profile/")
-      .then((response) => setProfile(response.data))
-      .catch(() => {});
+    loadProfile();
   }, []);
 
   const requestLocation = (onSuccess, onFailure) => {
@@ -144,7 +164,20 @@ function StudentAttendance() {
     setMessage("");
     setFeedbackStatus("info");
 
-    if (!profile?.registration_completed) {
+    if (profileLoading) {
+      setMessage("Loading your account details. Please try again in a moment.");
+      setFeedbackStatus("info");
+      return;
+    }
+
+    if (profileError || !profile) {
+      setMessage("");
+      setError("Your account details could not be loaded. Retry loading your profile before checking in.");
+      setFeedbackStatus("error");
+      return;
+    }
+
+    if (!profile.registration_completed) {
       setMessage("");
       setError("Complete your registration details before checking in.");
       setFeedbackStatus("error");
@@ -279,6 +312,39 @@ function StudentAttendance() {
               </strong>
 
               <p>{message || error}</p>
+            </div>
+          </div>
+        )}
+
+        {profileError && (
+          <div className="cp-attendance-feedback error" role="alert">
+            <span className="cp-attendance-feedback-icon">
+              <AlertIcon />
+            </span>
+            <div>
+              <strong>Unable to load your account</strong>
+              <p>{profileError}</p>
+              <button
+                type="button"
+                className="cp-attendance-empty-button"
+                onClick={loadProfile}
+                disabled={profileLoading}
+              >
+                <RefreshIcon />
+                {profileLoading ? "Loading profile..." : "Retry profile"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {profileLoading && (
+          <div className="cp-attendance-feedback info" role="status">
+            <span className="cp-attendance-feedback-icon">
+              <LocationIcon />
+            </span>
+            <div>
+              <strong>Checking your account</strong>
+              <p>Loading your registration details before enabling check-in.</p>
             </div>
           </div>
         )}
@@ -430,7 +496,7 @@ function StudentAttendance() {
                           : ""
                     }`}
                     onClick={() => checkIn(session.id)}
-                    disabled={session.has_checked_in || checking === session.id}
+                    disabled={session.has_checked_in || checking === session.id || profileLoading || Boolean(profileError) || !profile}
                   >
                     {session.has_checked_in ? (
                       <>
