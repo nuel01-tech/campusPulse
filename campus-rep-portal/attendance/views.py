@@ -1,5 +1,7 @@
 import logging
 import math
+import re
+from datetime import date
 from threading import Thread
 
 from rest_framework import generics, permissions
@@ -15,7 +17,7 @@ from django.db import models, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from rest_framework import status
-from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
+from .models import LectureSession, AttendanceRecord, Notification, CampusDocument, WeeklyAttendanceRegister, WeeklyAttendanceEntry
 from .utils import haversine_distance, is_location_confidently_within_radius
 from .models import Announcement
 from .serializers import AnnouncementSerializer, CampusDocumentSerializer, CampusDocumentUploadSerializer
@@ -238,6 +240,196 @@ class CheckInView(APIView):
 class IsClassRep(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == 'CLASS_REP'
+
+
+def _weekly_register_report(user, academic_year=None):
+    registers = WeeklyAttendanceRegister.objects.filter(
+        department=user.department,
+        level=user.level,
+    )
+    if academic_year:
+        registers = registers.filter(academic_year=academic_year)
+    registers = list(registers.order_by('academic_year', 'week_number'))
+    students = User.objects.filter(
+        role='STUDENT',
+        department=user.department,
+        level=user.level,
+        is_active=True,
+    ).order_by('last_name', 'first_name', 'username')
+    entries = WeeklyAttendanceEntry.objects.filter(
+        register__in=registers,
+        student__in=students,
+    ).select_related('register')
+    status_by_pair = {
+        (entry.student_id, entry.register_id): entry.status
+        for entry in entries
+    }
+    week_data = [
+        {
+            'id': register.pk,
+            'academic_year': register.academic_year,
+            'week_number': register.week_number,
+            'week_start_date': register.week_start_date.isoformat(),
+            'created_at': register.created_at.isoformat(),
+        }
+        for register in registers
+    ]
+    student_data = []
+    for student in students:
+        statuses = {}
+        present = absent = excused = unmarked = 0
+        for register in registers:
+            status_value = status_by_pair.get((student.pk, register.pk), 'UNMARKED')
+            statuses[str(register.pk)] = status_value
+            if status_value == 'PRESENT':
+                present += 1
+            elif status_value == 'ABSENT':
+                absent += 1
+            elif status_value == 'EXCUSED':
+                excused += 1
+            else:
+                unmarked += 1
+        opportunities = present + absent
+        student_data.append({
+            'id': student.pk,
+            'name': student.get_full_name() or student.username,
+            'matric_number': student.matric_number or '',
+            'statuses': statuses,
+            'present': present,
+            'absent': absent,
+            'excused': excused,
+            'unmarked': unmarked,
+            'attendance_percentage': round((present / opportunities) * 100) if opportunities else 0,
+        })
+    return {
+        'academic_year': academic_year or '',
+        'department': user.department.name if user.department_id else '',
+        'level': user.level or '',
+        'weeks': week_data,
+        'students': student_data,
+        'summary': {
+            'students': len(student_data),
+            'weeks_recorded': len(week_data),
+            'present_marks': sum(row['present'] for row in student_data),
+            'absent_marks': sum(row['absent'] for row in student_data),
+        },
+    }
+
+
+class WeeklyAttendanceReportView(APIView):
+    permission_classes = [IsClassRep]
+
+    def get(self, request):
+        academic_year = (request.query_params.get('academic_year') or '').strip()
+        if academic_year and not re.fullmatch(r'\d{4}/\d{4}', academic_year):
+            return Response({'detail': 'Academic year must use the format YYYY/YYYY.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not request.user.department or not request.user.level:
+            return Response({'detail': 'Your Class Rep account must have a department and level.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_weekly_register_report(request.user, academic_year or None))
+
+    def post(self, request):
+        user = request.user
+        if not user.department or not user.level:
+            return Response({'detail': 'Your Class Rep account must have a department and level.'}, status=status.HTTP_400_BAD_REQUEST)
+        academic_year = str(request.data.get('academic_year', '')).strip()
+        if not re.fullmatch(r'\d{4}/\d{4}', academic_year):
+            return Response({'academic_year': 'Use the format YYYY/YYYY.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            week_number = int(request.data.get('week_number'))
+            if not 1 <= week_number <= 52:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response({'week_number': 'Choose one week between 1 and 52.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            week_start_date = date.fromisoformat(str(request.data.get('week_start_date', '')))
+        except (TypeError, ValueError):
+            return Response({'week_start_date': 'Provide the Monday date for this week.'}, status=status.HTTP_400_BAD_REQUEST)
+        if week_start_date.weekday() != 0:
+            return Response({'week_start_date': 'The week starting date must be a Monday.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            register, created = WeeklyAttendanceRegister.objects.get_or_create(
+                department=user.department,
+                level=user.level,
+                academic_year=academic_year,
+                week_number=week_number,
+                defaults={'week_start_date': week_start_date, 'created_by': user},
+            )
+            if not created:
+                return Response({'detail': 'This week already has a register. Select it to continue recording attendance.'}, status=status.HTTP_409_CONFLICT)
+            roster = User.objects.filter(
+                role='STUDENT',
+                department=user.department,
+                level=user.level,
+                is_active=True,
+            )
+            WeeklyAttendanceEntry.objects.bulk_create([
+                WeeklyAttendanceEntry(register=register, student=student)
+                for student in roster
+            ])
+        return Response({
+            'detail': f'Week {week_number} register created.',
+            'register_id': register.pk,
+            'report': _weekly_register_report(user, academic_year),
+        }, status=status.HTTP_201_CREATED)
+
+
+class WeeklyAttendanceRegisterDetailView(APIView):
+    permission_classes = [IsClassRep]
+
+    def patch(self, request, pk):
+        user = request.user
+        try:
+            register = WeeklyAttendanceRegister.objects.get(
+                pk=pk,
+                department=user.department,
+                level=user.level,
+            )
+        except WeeklyAttendanceRegister.DoesNotExist:
+            return Response({'detail': 'Weekly register not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        entries = request.data.get('entries')
+        if not isinstance(entries, list) or not entries:
+            return Response({'entries': 'Provide at least one student attendance status.'}, status=status.HTTP_400_BAD_REQUEST)
+        allowed = {'UNMARKED', 'PRESENT', 'ABSENT', 'EXCUSED'}
+        validated_entries = []
+        seen_student_ids = set()
+        for item in entries:
+            if not isinstance(item, dict):
+                return Response({'entries': 'Each entry must contain student_id and status.'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                student_id = int(item.get('student_id'))
+            except (TypeError, ValueError):
+                return Response({'entries': 'Each entry must contain a valid student_id.'}, status=status.HTTP_400_BAD_REQUEST)
+            status_value = str(item.get('status', '')).upper()
+            if status_value not in allowed:
+                return Response({'entries': f'Invalid attendance status: {status_value}.'}, status=status.HTTP_400_BAD_REQUEST)
+            if student_id in seen_student_ids:
+                return Response({'entries': f'Student {student_id} appears more than once.'}, status=status.HTTP_400_BAD_REQUEST)
+            seen_student_ids.add(student_id)
+            student_exists = User.objects.filter(
+                pk=student_id,
+                role='STUDENT',
+                department=user.department,
+                level=user.level,
+            ).exists()
+            if not student_exists:
+                return Response({'entries': f'Student {student_id} is not in this class.'}, status=status.HTTP_400_BAD_REQUEST)
+            validated_entries.append((student_id, status_value))
+
+        with transaction.atomic():
+            for student_id, status_value in validated_entries:
+                entry, _ = WeeklyAttendanceEntry.objects.get_or_create(
+                    register=register,
+                    student_id=student_id,
+                )
+                entry.status = status_value
+                entry.marked_by = user if status_value != 'UNMARKED' else None
+                entry.save(update_fields=['status', 'marked_by', 'updated_at'])
+        return Response({
+            'detail': 'Weekly attendance saved.',
+            'report': _weekly_register_report(user, register.academic_year),
+        })
 
 
 class IsSessionManager(permissions.BasePermission):

@@ -14,6 +14,7 @@ import RepDashboard from "./pages/RepDashboard";
 import RepSessions from "./pages/RepSessions";
 import RepAnnouncements from "./pages/RepAnnouncements";
 import RepActivity from "./pages/RepActivity";
+import RepWeeklyAttendance from "./pages/RepWeeklyAttendance";
 
 import Profile from "./pages/Profile";
 import Security from "./pages/Security";
@@ -220,6 +221,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/rep/attendance-register" element={<ProtectedRoute allowedRole="CLASS_REP"><RepWeeklyAttendance /></ProtectedRoute>} />
 
         <Route
           path="/rep/announcements"
