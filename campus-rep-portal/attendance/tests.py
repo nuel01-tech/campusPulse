@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from accounts.models import Department
 from .models import AttendanceRecord, LectureSession
+from .serializers import LectureSessionSerializer
 
 from .utils import haversine_distance, is_location_confidently_within_radius
 
@@ -76,3 +77,36 @@ class StudentAttendanceStatsTests(TestCase):
         self.assertEqual(response.data["total_sessions"], 2)
         self.assertEqual(response.data["attended"], 1)
         self.assertEqual(response.data["rate"], 50)
+
+
+class LectureSessionInputValidationTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name="Physics", faculty="Science")
+
+    def payload(self):
+        return {
+            "department": self.department.pk,
+            "level": "200",
+            "course_code": "PHY201",
+            "venue_name": "Science Theatre",
+            "latitude": 6.8,
+            "longitude": 3.5,
+            "radius_meters": 50,
+        }
+
+    def test_rejects_latitude_outside_valid_range(self):
+        serializer = LectureSessionSerializer(data={**self.payload(), "latitude": 91})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("latitude", serializer.errors)
+
+    def test_rejects_longitude_outside_valid_range(self):
+        serializer = LectureSessionSerializer(data={**self.payload(), "longitude": 181})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("longitude", serializer.errors)
+
+    def test_rejects_zero_or_negative_attendance_radius(self):
+        for radius in (0, -10):
+            with self.subTest(radius=radius):
+                serializer = LectureSessionSerializer(data={**self.payload(), "radius_meters": radius})
+                self.assertFalse(serializer.is_valid())
+                self.assertIn("radius_meters", serializer.errors)
