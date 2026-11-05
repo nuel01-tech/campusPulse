@@ -100,6 +100,7 @@ class UpdateMatricView(APIView):
         phone_number = (request.data.get('phone_number') or '').strip()
 
         if user.role == 'STUDENT':
+            class_code = (request.data.get('class_code') or '').strip().upper()
             if not matric_number or not phone_number:
                 return Response(
                     {'detail': 'Matric number and WhatsApp number are required to complete registration.'},
@@ -107,6 +108,35 @@ class UpdateMatricView(APIView):
                 )
 
             selected_level = level or user.level
+            if not selected_level:
+                return Response(
+                    {'detail': 'Select your current academic level.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Require the department-and-level code only when the student first
+            # completes registration. Existing students can still update details.
+            if not user.registration_completed:
+                if not class_code:
+                    return Response(
+                        {'detail': 'Your department and level Class Code is required to complete registration.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                expected_code = ClassCode.objects.filter(
+                    department=user.department,
+                    level=selected_level,
+                ).first()
+                if not expected_code:
+                    return Response(
+                        {'detail': 'A Class Code has not been configured for your department and level. Contact your Class Representative or department administrator.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if expected_code.code.strip().upper() != class_code:
+                    return Response(
+                        {'detail': 'The Class Code is incorrect for your selected department and level.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             user.matric_number = matric_number
             user.phone_number = phone_number
