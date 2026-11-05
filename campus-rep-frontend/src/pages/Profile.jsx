@@ -165,8 +165,13 @@ function Profile() {
 
       await loadProfile();
     } catch (e) {
+      const responseErrors = e.response?.data;
       setError(
-        e.response?.data?.detail || "Unable to update your profile details.",
+        responseErrors?.detail ||
+          responseErrors?.class_code ||
+          responseErrors?.matric_number ||
+          responseErrors?.phone_number ||
+          "Unable to update your profile details.",
       );
     } finally {
       setSaving(false);
