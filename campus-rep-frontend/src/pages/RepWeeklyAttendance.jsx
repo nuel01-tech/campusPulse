@@ -62,6 +62,18 @@ function RepWeeklyAttendance() {
       ?? "UNMARKED";
   };
 
+  const getStudentCounts = (student) => {
+    const counts = { present: 0, absent: 0, excused: 0 };
+    for (const week of report.weeks) {
+      const value = getStudentStatus(student, week.id);
+      if (value === "PRESENT") counts.present += 1;
+      if (value === "ABSENT") counts.absent += 1;
+      if (value === "EXCUSED") counts.excused += 1;
+    }
+    const opportunities = counts.present + counts.absent;
+    return { ...counts, percentage: opportunities ? Math.round((counts.present / opportunities) * 100) : 0 };
+  };
+
   const changeAcademicYear = async (event) => {
     const value = event.target.value.trim();
     setAcademicYear(value);
@@ -266,10 +278,10 @@ function RepWeeklyAttendance() {
                           {status === "PRESENT" ? "P" : status === "ABSENT" ? "A" : status === "EXCUSED" ? "E" : "—"}
                         </td>;
                       })}
-                      <td>{student.present}</td>
-                      <td>{student.absent}</td>
-                      <td>{student.excused}</td>
-                      <td>{student.attendance_percentage}%</td>
+                      <td>{getStudentCounts(student).present}</td>
+                      <td>{getStudentCounts(student).absent}</td>
+                      <td>{getStudentCounts(student).excused}</td>
+                      <td>{getStudentCounts(student).percentage}%</td>
                     </tr>
                   ))}
                   {!report.students.length && <tr><td colSpan={Math.max(5, report.weeks.length + 5)}>No students found.</td></tr>}
