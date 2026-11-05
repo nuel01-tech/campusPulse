@@ -145,7 +145,9 @@ function StudentAttendance() {
     setFeedbackStatus("info");
 
     if (!profile?.registration_completed) {
+      setMessage("");
       setError("Complete your registration details before checking in.");
+      setFeedbackStatus("error");
       return;
     }
 
