@@ -401,7 +401,10 @@ class MyStatsView(APIView):
     def get(self, request):
         eligible_sessions = LectureSession.objects.filter(
             department=request.user.department,
-            level=request.user.level
+            level=request.user.level,
+        ).exclude(
+            is_active=False,
+            has_ended=False,
         ).order_by('-created_at')
 
         total_sessions = eligible_sessions.count()
