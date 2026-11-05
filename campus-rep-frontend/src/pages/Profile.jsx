@@ -79,6 +79,7 @@ function Profile() {
   const [form, setForm] = useState({
     matric_number: "",
     phone_number: "",
+    class_code: "",
     level: "",
     first_name: "",
     last_name: "",
@@ -114,6 +115,7 @@ function Profile() {
       setForm({
         matric_number: r.data.matric_number || "",
         phone_number: r.data.phone_number || "",
+        class_code: "",
         level: r.data.level || "",
         first_name: r.data.first_name || "",
         last_name: r.data.last_name || "",
@@ -149,11 +151,17 @@ function Profile() {
     setMessage("");
 
     try {
-      const r = await api.patch("/accounts/update-matric/", {
+      const payload = {
         matric_number: form.matric_number.trim(),
         phone_number: form.phone_number.trim(),
         level: form.level,
-      });
+      };
+
+      if (profile?.role === "STUDENT" && !profile.registration_completed) {
+        payload.class_code = form.class_code.trim().toUpperCase();
+      }
+
+      const r = await api.patch("/accounts/update-matric/", payload);
 
       setMessage(r.data.detail || "Profile details updated successfully.");
       window.dispatchEvent(new Event("campuspulse:profile-updated"));
@@ -621,6 +629,31 @@ function Profile() {
                   required={!isRep}
                 />
               </label>
+
+              {profile?.role === "STUDENT" && !profile.registration_completed && (
+                <label>
+                  Department and level Class Code
+                  <input
+                    value={form.class_code}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        class_code: e.target.value.toUpperCase(),
+                      })
+                    }
+                    placeholder="Enter the 6-character class code"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    maxLength={6}
+                    minLength={6}
+                    required
+                  />
+                  <small>
+                    Get this code from your Class Representative. It must match
+                    your selected department and level.
+                  </small>
+                </label>
+              )}
 
               {!isRep && (
                 <div className="cp-profile-level-box">
