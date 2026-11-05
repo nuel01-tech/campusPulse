@@ -112,6 +112,25 @@ class SignupRegistrationTests(TestCase):
         student.refresh_from_db()
         self.assertFalse(student.registration_completed)
 
+    def test_existing_completed_student_can_update_without_reentering_class_code(self):
+        student = User.objects.create_user(
+            username='student_already_registered',
+            password='StrongPass123',
+            department=self.department,
+            level='200',
+            registration_completed=True,
+        )
+        self.client.force_authenticate(user=student)
+        response = self.client.patch(
+            '/api/accounts/update-matric/',
+            self.completion_payload(),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        student.refresh_from_db()
+        self.assertTrue(student.registration_completed)
+        self.assertEqual(student.matric_number, 'CMP/2022/010')
+
 
 class ClassmatesAndManagementTests(TestCase):
     def setUp(self):
