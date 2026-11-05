@@ -1,0 +1,144 @@
+/**
+ * Central error handling.
+ *
+ * Every failure that reaches the UI is converted to an AppError with a stable
+ * `code` and a `message` written for the person reading it. Database
+ * functions raise short codes (e.g. MATRIC_NOT_FOUND); this module owns the
+ * wording, so it can be changed in one place.
+ */
+
+export class AppError extends Error {
+  readonly code: string;
+  readonly detail?: string;
+
+  constructor(code: string, message: string, detail?: string) {
+    super(message);
+    this.name = 'AppError';
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
+type MessageFor = (detail?: string) => string;
+
+const MESSAGES: Record<string, string | MessageFor> = {
+  // Accounts & Super Admin
+  SIGNUP_NOT_ALLOWED: 'Only the Super Admin can create class rep accounts.',
+  REP_EXISTS: 'A class rep with that email already exists.',
+  ACCOUNT_SUSPENDED: 'Your class rep account has been suspended. Contact the Super Admin.',
+  STUDENT_SUSPENDED: 'Your account has been suspended by your class rep.',
+  INVALID_EMAIL: 'Enter a valid email address.',
+  INVALID_NAME: 'Enter the class rep’s full name.',
+  NOT_FOUND: 'That record could not be found.',
+
+  // Claiming
+  CLASS_NOT_FOUND: 'This class link is not valid. Ask your class rep for the correct link.',
+  MATRIC_NOT_FOUND:
+    'That matric number is not on the class list. Check it carefully, or ask your class rep to add you.',
+  ALREADY_CLAIMED:
+    'This matric number has already been claimed on another phone. If that was not you, tell your class rep to reset it.',
+  NAME_MISMATCH:
+    'The name does not match the class list for this matric number. Type at least your surname and first name.',
+  DEVICE_ALREADY_CLAIMED: 'This phone is already linked to another student.',
+  REP_CANNOT_CLAIM: 'You are signed in as staff. Sign out first to claim a student account.',
+
+  // Check-in
+  SESSION_NOT_FOUND: 'This session no longer exists.',
+  SESSION_NOT_STARTED: 'This session has not started yet.',
+  SESSION_CLOSED: 'This session has closed. Check-in is no longer possible.',
+  NOT_IN_CLASS: 'You are not on the class list for this session.',
+  ALREADY_CHECKED_IN: 'You have already checked in for this session.',
+  LOW_ACCURACY:
+    'Your location is not precise enough. Turn on precise location, step near a window or outside, and try again.',
+  INVALID_LOCATION: 'Could not read a valid location from your phone. Try again.',
+  OUT_OF_RANGE: (d) =>
+    d
+      ? `You are about ${d} m from the venue, which is outside the allowed area. Move closer and try again.`
+      : 'You are outside the allowed area for this session. Move closer and try again.',
+
+  // Geolocation (browser)
+  GEO_UNSUPPORTED: 'This browser cannot share location. Open the link in Chrome or Safari.',
+  GEO_DENIED:
+    'Location permission is blocked. Allow location for this site in your browser settings, then try again.',
+  GEO_UNAVAILABLE: 'Your phone could not get a location. Turn on location/GPS and try again.',
+  GEO_TIMEOUT: 'Getting your location took too long. Move to an open area and try again.',
+  GEO_INSECURE: 'Location only works on a secure (https) link.',
+
+  // General
+  NOT_AUTHENTICATED: 'Your session has expired. Please sign in again.',
+  NETWORK: 'No connection. Check your internet and try again.',
+  DUPLICATE: 'That record already exists.',
+  PERMISSION: 'You do not have permission to do that.',
+  CONFIG: 'The app is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+  UNKNOWN: 'Something went wrong. Please try again.',
+};
+
+export function messageFor(code: string, detail?: string): string {
+  const entry = MESSAGES[code] ?? MESSAGES.UNKNOWN!;
+  return typeof entry === 'function' ? entry(detail) : entry;
+}
+
+export function appError(code: string, detail?: string): AppError {
+  return new AppError(code, messageFor(code, detail), detail);
+}
+
+interface PgLikeError {
+  message?: string;
+  code?: string;
+  details?: string | null;
+  status?: number;
+  name?: string;
+}
+
+function isPgLike(e: unknown): e is PgLikeError {
+  return typeof e === 'object' && e !== null && ('message' in e || 'code' in e);
+}
+
+/** Converts anything thrown into an AppError. Never throws. */
+export function toAppError(e: unknown): AppError {
+  if (e instanceof AppError) return e;
+
+  if (e instanceof TypeError && /fetch|network/i.test(e.message)) {
+    return appError('NETWORK');
+  }
+
+  if (isPgLike(e)) {
+    const raw = (e.message ?? '').trim();
+
+    // Codes raised by our SQL functions are plain upper-snake strings.
+    if (/^[A-Z_]+$/.test(raw) && raw in MESSAGES) {
+      return appError(raw, e.details ?? undefined);
+    }
+    if (raw.includes('SIGNUP_NOT_ALLOWED')) return appError('SIGNUP_NOT_ALLOWED');
+
+    if (e.code === '23505') return appError('DUPLICATE');
+    if (e.code === '42501' || e.status === 403) return appError('PERMISSION');
+    if (e.status === 401 || /jwt|refresh token/i.test(raw)) return appError('NOT_AUTHENTICATED');
+    if (/failed to fetch|network/i.test(raw)) return appError('NETWORK');
+
+    // Auth errors from Supabase are already human readable.
+    if (e.name === 'AuthApiError' || e.name === 'AuthWeakPasswordError') {
+      return new AppError('AUTH', raw || messageFor('UNKNOWN'));
+    }
+
+    if (raw) {
+      console.error('[unmapped error]', e);
+      return new AppError('UNKNOWN', messageFor('UNKNOWN'), raw);
+    }
+  }
+
+  console.error('[unexpected error]', e);
+  return appError('UNKNOWN');
+}
+
+/** Unwraps a Supabase `{ data, error }` result, throwing an AppError on failure. */
+export function unwrap<T>(result: { data: T | null; error: unknown }): T {
+  if (result.error) throw toAppError(result.error);
+  if (result.data === null) throw appError('UNKNOWN', 'Empty response');
+  return result.data;
+}
+
+/** Like unwrap, for writes that return no rows. */
+export function check(result: { error: unknown }): void {
+  if (result.error) throw toAppError(result.error);
+}

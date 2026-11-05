@@ -1,0 +1,78 @@
+/** Domain types. These mirror the tables in supabase/migrations/0001_init.sql. */
+
+export type StaffRole = 'super_admin' | 'rep';
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: StaffRole;
+  active: boolean;
+  created_at: string;
+}
+
+export interface RepSummary {
+  id: string;
+  email: string;
+  full_name: string;
+  active: boolean;
+  created_at: string;
+  class_count: number;
+  student_count: number;
+}
+
+export interface ClassRoom {
+  id: string;
+  owner_id: string;
+  name: string;
+  join_code: string;
+  semester_start: string | null; // ISO date (yyyy-mm-dd)
+  created_at: string;
+}
+
+export interface Student {
+  id: string;
+  class_id: string;
+  full_name: string;
+  matric_no: string;
+  user_id: string | null;
+  claimed_at: string | null;
+  suspended: boolean;
+  created_at: string;
+}
+
+export interface Session {
+  id: string;
+  class_id: string;
+  course_code: string;
+  venue: string;
+  lat: number;
+  lng: number;
+  radius_m: number;
+  week: number;
+  starts_at: string;
+  ends_at: string;
+  created_at: string;
+}
+
+export interface Attendance {
+  id: string;
+  session_id: string;
+  student_id: string;
+  checked_in_at: string;
+  distance_m: number | null;
+  accuracy_m: number | null;
+  manual: boolean;
+}
+
+/** A roster row before it is saved. */
+export interface RosterEntry {
+  full_name: string;
+  matric_no: string;
+}
+
+export interface GeoFix {
+  lat: number;
+  lng: number;
+  accuracy: number;
+}
