@@ -55,6 +55,8 @@ function RepWeeklyAttendance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep the single selected week's editable values in sync with the loaded register.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!activeRegister) {
       setDraftStatuses({});
@@ -127,7 +129,6 @@ function RepWeeklyAttendance() {
     }
   };
 
-  const selectedWeekDate = activeRegister?.week_start_date || weekStartDate;
   const markedCount = Object.values(draftStatuses).filter((value) => value !== "UNMARKED").length;
 
   return (
@@ -227,6 +228,11 @@ function RepWeeklyAttendance() {
         </section>
 
         <section className="cp-weekly-matrix-section">
+          <div className="cp-weekly-print-heading">
+            <h1>CampusPulse — Weekly Class Attendance Register</h1>
+            <p>{report.department || "Department"} · {report.level || ""} Level · Academic year {academicYear}</p>
+            <p>Present: P · Absent: A · Excused: E · —: Not marked</p>
+          </div>
           <div className="cp-weekly-section-heading">
             <div>
               <h2>Class attendance matrix</h2>
