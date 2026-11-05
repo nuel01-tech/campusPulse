@@ -118,21 +118,12 @@ function StudentAttendance() {
       onFailure(locationError);
     };
 
+    // Do not silently fall back to a cached/coarse fix for a 50m attendance geofence.
+    // A fresh high-accuracy reading is required; the server also checks its uncertainty.
     navigator.geolocation.getCurrentPosition(
       acceptPosition,
-      (locationError) => {
-        if (locationError.code === 1) {
-          fail(locationError);
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          acceptPosition,
-          fail,
-          { enableHighAccuracy: false, timeout: 30000, maximumAge: 15000 },
-        );
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 },
+      fail,
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
     );
   };
 
@@ -159,6 +150,7 @@ function StudentAttendance() {
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
               attendance_grant: attendanceGrant,
             },
           );
