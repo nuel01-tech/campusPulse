@@ -14,7 +14,8 @@ from .views import (
     MyStatsView,
     ExportAttendanceView,
     AuditLogView,
-    MyClassCodeView, NotificationListView, NotificationReadView, NotificationReadAllView, MyHistoryView
+    MyClassCodeView, NotificationListView, NotificationReadView, NotificationReadAllView, MyHistoryView,
+    WeeklyAttendanceReportView, WeeklyAttendanceRegisterDetailView
 )
 
 urlpatterns = [
@@ -32,6 +33,8 @@ urlpatterns = [
     path('announcements/create/', AnnouncementCreateView.as_view(), name='announcement-create'),
     path('announcements/', AnnouncementListView.as_view(), name='announcement-list'),
     path('my-stats/', MyStatsView.as_view(), name='my-stats'),
+    path('weekly-register/', WeeklyAttendanceReportView.as_view(), name='weekly-attendance-register'),
+    path('weekly-register/<int:pk>/', WeeklyAttendanceRegisterDetailView.as_view(), name='weekly-attendance-register-detail'),
     path('audit-log/', AuditLogView.as_view(), name='audit-log'),
     path('my-class-code/', MyClassCodeView.as_view(), name='my-class-code'),
     path('notifications/', NotificationListView.as_view(), name='notifications'),
