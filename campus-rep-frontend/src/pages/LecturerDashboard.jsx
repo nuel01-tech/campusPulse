@@ -139,8 +139,17 @@ function LecturerDashboard() {
       const response = await api.post(
         `/attendance/sessions/${session.id}/toggle/`,
       );
+      const updatedSession = response.data?.session;
+
+      if (updatedSession) {
+        setSessions((current) =>
+          current.map((item) =>
+            item.id === session.id ? { ...item, ...updatedSession } : item,
+          ),
+        );
+      }
+
       setNotice(response.data?.detail || "Session status updated.");
-      await load();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Unable to update this session."));
     } finally {
