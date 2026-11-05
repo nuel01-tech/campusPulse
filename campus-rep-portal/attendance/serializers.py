@@ -1,3 +1,5 @@
+import math
+
 from rest_framework import serializers
 from accounts.models import Department
 from .models import LectureSession, Announcement, CampusDocument
@@ -16,6 +18,21 @@ class LectureSessionSerializer(serializers.ModelSerializer):
         model = LectureSession
         fields = '__all__'
         read_only_fields = ['created_by', 'is_active', 'has_ended', 'created_at']
+
+    def validate_latitude(self, value):
+        if not math.isfinite(value) or not -90 <= value <= 90:
+            raise serializers.ValidationError("Latitude must be a finite value between -90 and 90.")
+        return value
+
+    def validate_longitude(self, value):
+        if not math.isfinite(value) or not -180 <= value <= 180:
+            raise serializers.ValidationError("Longitude must be a finite value between -180 and 180.")
+        return value
+
+    def validate_radius_meters(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Attendance radius must be greater than zero.")
+        return value
 
     def get_attendee_count(self, obj):
         return obj.attendancerecord_set.count()
