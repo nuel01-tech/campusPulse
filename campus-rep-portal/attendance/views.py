@@ -12,6 +12,7 @@ from django.http import HttpResponse, FileResponse
 from django.utils.text import get_valid_filename
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from rest_framework import status
 from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
@@ -380,11 +381,12 @@ class ActiveSessionsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        checked_in = AttendanceRecord.objects.filter(student=self.request.user, session_id=OuterRef("pk"))
         return LectureSession.objects.filter(
             department=self.request.user.department,
             level=self.request.user.level,
-            is_active=True
-        )
+            is_active=True,
+        ).annotate(student_has_checked_in=Exists(checked_in))
 class MySessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
     permission_classes = [IsSessionManager]
