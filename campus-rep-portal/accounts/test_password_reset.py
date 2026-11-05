@@ -69,6 +69,28 @@ class GmailSmtpPasswordResetTests(TestCase):
         )
         self.assertEqual(message.alternatives[0][1], "text/html")
 
+    @override_settings(DEBUG=False, **SMTP_SETTINGS)
+    def test_lecturer_can_request_password_reset_without_class_code(self):
+        lecturer = User.objects.create_user(
+            username="lecturer",
+            email="lecturer@example.com",
+            password="StrongPassword123!",
+            department=self.department,
+            level="200",
+            role="LECTURER",
+            lecturer_approved=True,
+            is_active=True,
+        )
+        response = self.client.post(
+            "/api/accounts/forgot-password/",
+            {"username": lecturer.username, "email": lecturer.email},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [lecturer.email])
+
     @override_settings(
         DEBUG=False,
         **SMTP_SETTINGS,
