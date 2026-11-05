@@ -36,7 +36,7 @@ jobs:
       - name: Run Django system checks
         run: python manage.py check
       - name: Run backend regression tests
-        run: python manage.py test attendance
+        run: python manage.py test accounts attendance
 
   frontend-build:
     name: Frontend production build
