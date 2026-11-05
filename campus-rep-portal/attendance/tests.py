@@ -1,4 +1,8 @@
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+from accounts.models import Department
+from .models import AttendanceRecord, LectureSession
 
 from .utils import haversine_distance, is_location_confidently_within_radius
 
@@ -33,3 +37,42 @@ class GPSAccuracyTests(SimpleTestCase):
 
     def test_rejects_invalid_accuracy(self):
         self.assertFalse(is_location_confidently_within_radius(20, float("nan"), 50))
+
+
+class StudentAttendanceStatsTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.department = Department.objects.create(name="Computer Science", faculty="Science")
+        self.student = get_user_model().objects.create_user(
+            username="stats_student",
+            password="StrongPass123",
+            department=self.department,
+            level="200",
+            role="STUDENT",
+        )
+        self.client.force_authenticate(user=self.student)
+
+    def create_session(self, *, is_active, has_ended):
+        return LectureSession.objects.create(
+            department=self.department,
+            level="200",
+            course_code="CSC201",
+            venue_name="LT1",
+            latitude=6.8,
+            longitude=3.5,
+            is_active=is_active,
+            has_ended=has_ended,
+        )
+
+    def test_never_started_sessions_do_not_reduce_attendance_rate(self):
+        completed = self.create_session(is_active=False, has_ended=True)
+        self.create_session(is_active=True, has_ended=False)
+        self.create_session(is_active=False, has_ended=False)
+        AttendanceRecord.objects.create(student=self.student, session=completed)
+
+        response = self.client.get("/api/attendance/my-stats/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_sessions"], 2)
+        self.assertEqual(response.data["attended"], 1)
+        self.assertEqual(response.data["rate"], 50)
