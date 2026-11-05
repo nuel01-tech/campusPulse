@@ -144,3 +144,72 @@ class CampusDocument(models.Model):
 
     def __str__(self):
         return self.title
+
+class WeeklyAttendanceRegister(models.Model):
+    """One class roll-call register for one academic week."""
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
+    level = models.CharField(max_length=3, choices=[
+        ('100', '100 Level'), ('200', '200 Level'), ('300', '300 Level'),
+        ('400', '400 Level'), ('500', '500 Level'),
+    ])
+    academic_year = models.CharField(max_length=9)
+    week_number = models.PositiveSmallIntegerField()
+    week_start_date = models.DateField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='weekly_attendance_registers',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['academic_year', 'week_number']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['department', 'level', 'academic_year', 'week_number'],
+                name='unique_weekly_class_register',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(week_number__gte=1) & models.Q(week_number__lte=52),
+                name='weekly_register_week_1_52',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.department} · {self.level} Level · {self.academic_year} · Week {self.week_number}'
+
+
+class WeeklyAttendanceEntry(models.Model):
+    STATUS_CHOICES = (
+        ('UNMARKED', 'Not marked'),
+        ('PRESENT', 'Present'),
+        ('ABSENT', 'Absent'),
+        ('EXCUSED', 'Excused'),
+    )
+    register = models.ForeignKey(
+        WeeklyAttendanceRegister,
+        on_delete=models.CASCADE,
+        related_name='entries',
+    )
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='UNMARKED')
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='weekly_attendance_marks',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['student__last_name', 'student__first_name', 'student__username']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['register', 'student'],
+                name='unique_student_weekly_attendance',
+            ),
+        ]
+
