@@ -164,8 +164,17 @@ function StudentAttendance() {
           );
 
           setMessage(response.data.detail || "Successfully checked in!");
-
-          await loadSessions();
+          setSessions((current) =>
+            current.map((session) =>
+              session.id === id
+                ? {
+                    ...session,
+                    has_checked_in: true,
+                    attendee_count: (session.attendee_count || 0) + 1,
+                  }
+                : session,
+            ),
+          );
         } catch (requestError) {
           setError(
             requestError.response?.data?.detail ||
@@ -391,12 +400,21 @@ function StudentAttendance() {
                   <button
                     type="button"
                     className={`cp-attendance-check-button ${
-                      checking === session.id ? "checking" : ""
+                      session.has_checked_in
+                        ? "checked-in"
+                        : checking === session.id
+                          ? "checking"
+                          : ""
                     }`}
                     onClick={() => checkIn(session.id)}
-                    disabled={checking === session.id}
+                    disabled={session.has_checked_in || checking === session.id}
                   >
-                    {checking === session.id ? (
+                    {session.has_checked_in ? (
+                      <>
+                        <CheckIcon />
+                        Checked in
+                      </>
+                    ) : checking === session.id ? (
                       <>
                         <span className="cp-attendance-spinner" />
                         Verifying...
