@@ -332,7 +332,7 @@ function Signup() {
 
             <p>
               {role === "STUDENT"
-                ? "Create your student account, then add your matriculation and contact details after signing in."
+                ? "Create your student account, then complete your matriculation, contact details and department-and-level Class Code after signing in."
                 : "Choose the departments and levels you teach. An administrator will review your lecturer account before access is enabled."}
             </p>
           </div>
