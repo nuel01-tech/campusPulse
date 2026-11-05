@@ -272,7 +272,7 @@ function RepDashboard() {
     navigator.geolocation.getCurrentPosition(
       async (p) => {
         try {
-          await api.post("/attendance/sessions/create/", {
+          const response = await api.post("/attendance/sessions/create/", {
             course_code: courseCode,
             venue_name: venueName,
             level,
@@ -281,11 +281,13 @@ function RepDashboard() {
             longitude: p.coords.longitude,
           });
 
+          if (response.data?.id) {
+            setSessions((current) => [response.data, ...current]);
+          }
+
           setCourseCode("");
           setVenueName("");
           setNotice("Session created successfully.");
-
-          await load();
         } catch (e) {
           setError(e.response?.data?.detail || "Failed to create session.");
         } finally {
