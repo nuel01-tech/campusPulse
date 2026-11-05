@@ -13872,6 +13872,12 @@ select:focus-visible {
   color: var(--cp-green-900, #0b5136);
 }
 
+.cp-attendance-feedback.info {
+  border-color: #cbdcf0;
+  background: #f4f8fd;
+  color: #25496d;
+}
+
 .cp-attendance-feedback.error {
   border-color: #ead3d3;
   background: #fdf6f6;
