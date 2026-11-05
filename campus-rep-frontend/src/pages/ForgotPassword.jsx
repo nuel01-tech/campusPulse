@@ -69,7 +69,7 @@ function ForgotPassword() {
             </h1>
 
             <p>
-              Confirm your account details and class code to receive
+              Confirm your account details. Students and Class Reps also use their class code to receive
               a secure password reset link.
             </p>
 
@@ -126,8 +126,7 @@ function ForgotPassword() {
               <h2>Reset your password.</h2>
 
               <p>
-                Enter your username, email and class code. We’ll use
-                them to verify your account before continuing.
+                Enter your username and email. Students and Class Reps must also enter their current class code.
               </p>
             </div>
 
@@ -176,7 +175,7 @@ function ForgotPassword() {
               <div className="cp-auth-field">
                 <div className="cp-auth-label-row">
                   <label htmlFor="forgot-class-code">
-                    Class code
+                    Class code (students and Class Reps)
                   </label>
 
                   <span>6 characters</span>
@@ -193,7 +192,6 @@ function ForgotPassword() {
                   }
                   placeholder="e.g. ABC123"
                   maxLength={6}
-                  required
                   autoCapitalize="characters"
                 />
               </div>
