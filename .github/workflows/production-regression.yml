@@ -41,7 +41,7 @@ jobs:
         run: python manage.py test accounts attendance --verbosity 2
 
   frontend-build:
-    name: Frontend production build
+    name: Frontend build and lint
     runs-on: ubuntu-latest
     defaults:
       run:
