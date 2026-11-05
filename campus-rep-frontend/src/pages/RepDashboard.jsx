@@ -118,6 +118,24 @@ function ArrowIcon() {
   );
 }
 
+function getApiErrorMessage(error, fallback) {
+  const data = error?.response?.data;
+  if (!data) {
+    if (error?.code === "ECONNABORTED") return "The server took too long to respond. Check your connection and try again.";
+    if (error?.message === "Network Error") return "CampusPulse could not reach the server. Check your internet connection and try again.";
+    return fallback;
+  }
+  if (typeof data.detail === "string") return data.detail;
+  if (typeof data === "string") return data;
+  const messages = Object.entries(data).flatMap(([field, value]) => {
+    const items = Array.isArray(value) ? value : [value];
+    return items.filter((item) => typeof item === "string").map((item) =>
+      field === "non_field_errors" ? item : `${field.replaceAll("_", " ")}: ${item}`,
+    );
+  });
+  return messages.length ? messages.join(" ") : fallback;
+}
+
 function RepDashboard() {
   const navigate = useNavigate();
 
@@ -273,31 +291,40 @@ function RepDashboard() {
       async (p) => {
         try {
           const response = await api.post("/attendance/sessions/create/", {
-            course_code: courseCode,
-            venue_name: venueName,
+            course_code: courseCode.trim(),
+            venue_name: venueName.trim(),
             level,
-            radius_meters: radius,
+            radius_meters: Number(radius),
             latitude: p.coords.latitude,
             longitude: p.coords.longitude,
           });
 
           if (response.data?.id) {
             setSessions((current) => [response.data, ...current]);
+          } else {
+            // Do not show success if the server did not return the created session.
+            throw new Error("The server did not confirm that the session was created. Refresh your sessions before trying again.");
           }
 
           setCourseCode("");
           setVenueName("");
           setNotice("Session created successfully.");
         } catch (e) {
-          setError(e.response?.data?.detail || "Failed to create session.");
+          setError(getApiErrorMessage(e, e.message || "Failed to create session."));
         } finally {
           setLoading(false);
         }
       },
-      () => {
-        setError("Could not get your location. Please allow location access.");
+      (geoError) => {
+        const messages = {
+          1: "Location permission was denied. Allow location access for CampusPulse in your browser settings, then try again.",
+          2: "Your device could not determine its location. Turn on device location/GPS, move near an open area, and try again.",
+          3: "Getting your location timed out. Check that GPS is on and try again.",
+        };
+        setError(messages[geoError.code] || "CampusPulse could not access your device location. Check location permissions and try again.");
         setLoading(false);
       },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   };
 
