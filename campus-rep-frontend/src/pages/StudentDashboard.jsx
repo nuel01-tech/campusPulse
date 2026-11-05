@@ -242,21 +242,11 @@ function StudentDashboard() {
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
 
-    try {
-      return await locate({
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 0,
-      });
-    } catch (error) {
-      if (error.code === 1) throw error;
-
-      return locate({
-        enableHighAccuracy: false,
-        timeout: 30000,
-        maximumAge: 15000,
-      });
-    }
+    return locate({
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 0,
+    });
   };
 
   const requestLocationAccess = async () => {
@@ -308,12 +298,21 @@ function StudentDashboard() {
         {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
           attendance_grant: attendanceGrant,
         },
       );
 
+      setActiveSessions((current) => current.map((session) =>
+        session.id === id
+          ? {
+              ...session,
+              has_checked_in: true,
+              attendee_count: (session.attendee_count || 0) + 1,
+            }
+          : session,
+      ));
       setMessage(response.data.detail || "Successfully checked in!");
-      await loadData();
     } catch (e) {
       setMessage("");
       if (e.response?.data?.no_passkey) {
@@ -478,9 +477,9 @@ function StudentDashboard() {
                   </button>
 
                   <button
-                    className="cp-student-checkin"
-                    aria-label="Confirm with your passkey and check in"
-                    disabled={checking === primarySession.id}
+                    className={`cp-student-checkin ${primarySession.has_checked_in ? "checked-in" : ""}`}
+                    aria-label={primarySession.has_checked_in ? "Attendance already recorded" : "Confirm with your passkey and check in"}
+                    disabled={primarySession.has_checked_in || checking === primarySession.id}
                     onClick={() => handleCheckIn(primarySession.id)}
                     type="button"
                   >
@@ -489,6 +488,8 @@ function StudentDashboard() {
                       <span className="cp-student-button-spinner" />
                       Verifying location…
                     </>
+                  ) : primarySession.has_checked_in ? (
+                    "Checked in"
                   ) : (
                     <>
                       <LocationIcon size={16} />
@@ -739,12 +740,12 @@ function StudentDashboard() {
                     </span>
 
                     <button
-                      className="cp-student-session-button"
-                      disabled={checking === session.id}
+                      className={`cp-student-session-button ${session.has_checked_in ? "checked-in" : ""}`}
+                      disabled={session.has_checked_in || checking === session.id}
                       onClick={() => handleCheckIn(session.id)}
                       type="button"
                     >
-                      {checking === session.id ? "Checking…" : "Check in"}
+                      {checking === session.id ? "Checking…" : session.has_checked_in ? "Checked in" : "Check in"}
                     </button>
                   </div>
                 ))}
