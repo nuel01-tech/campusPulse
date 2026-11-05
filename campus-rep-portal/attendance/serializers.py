@@ -10,6 +10,7 @@ class LectureSessionSerializer(serializers.ModelSerializer):
         required=False,
     )
     attendee_count = serializers.SerializerMethodField()
+    has_checked_in = serializers.SerializerMethodField()
 
     class Meta:
         model = LectureSession
@@ -18,6 +19,11 @@ class LectureSessionSerializer(serializers.ModelSerializer):
 
     def get_attendee_count(self, obj):
         return obj.attendancerecord_set.count()
+
+    def get_has_checked_in(self, obj):
+        # ActiveSessionsView annotates this value in one query. Other session
+        # views safely default to False without introducing per-row queries.
+        return bool(getattr(obj, "student_has_checked_in", False))
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
