@@ -335,9 +335,18 @@ function RepDashboard() {
     setNotice("");
 
     try {
-      await api.post(`/attendance/sessions/${id}/toggle/`);
+      const response = await api.post(`/attendance/sessions/${id}/toggle/`);
+      const updatedSession = response.data?.session;
 
-      await load();
+      if (updatedSession) {
+        setSessions((current) =>
+          current.map((session) =>
+            session.id === id ? { ...session, ...updatedSession } : session,
+          ),
+        );
+      }
+
+      setNotice(response.data?.detail || "Session status updated.");
     } catch (e) {
       setError(e.response?.data?.detail || "Failed to update session.");
     } finally {
