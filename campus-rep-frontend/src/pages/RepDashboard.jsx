@@ -456,6 +456,23 @@ function RepDashboard() {
           </div>
         </section>
 
+        <section className="cp-rep-section cp-weekly-register-promo">
+          <div className="cp-rep-section-header">
+            <div>
+              <span className="cp-page-eyebrow">Weekly class register</span>
+              <h2>Weekly attendance & printable report</h2>
+              <p>Choose one week at a time, mark students present or absent, and print the full register with each student's totals.</p>
+            </div>
+            <button
+              type="button"
+              className="cp-rep-primary-button"
+              onClick={() => navigate("/rep/attendance-register")}
+            >
+              Open weekly register <ArrowIcon />
+            </button>
+          </div>
+        </section>
+
         {/* =================================================
             CLASS CODE
         ================================================== */}
