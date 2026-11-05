@@ -50,24 +50,17 @@ function RepWeeklyAttendance() {
   };
 
   useEffect(() => {
-    load(DEFAULT_ACADEMIC_YEAR);
-    // Initial load is intentionally performed once.
+    // Defer the initial request so state updates happen after the effect commits.
+    Promise.resolve().then(() => load(DEFAULT_ACADEMIC_YEAR));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep the single selected week's editable values in sync with the loaded register.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
-    if (!activeRegister) {
-      setDraftStatuses({});
-      return;
-    }
-    const next = {};
-    for (const student of report.students) {
-      next[student.id] = student.statuses?.[String(activeRegister.id)] || "UNMARKED";
-    }
-    setDraftStatuses(next);
-  }, [activeRegister, report.students]);
+  const getStudentStatus = (student, registerId = activeRegister?.id) => {
+    if (!registerId) return "UNMARKED";
+    return draftStatuses[registerId]?.[student.id]
+      ?? student.statuses?.[String(registerId)]
+      ?? "UNMARKED";
+  };
 
   const changeAcademicYear = async (event) => {
     const value = event.target.value.trim();
@@ -114,13 +107,18 @@ function RepWeeklyAttendance() {
     try {
       const entries = report.students.map((student) => ({
         student_id: student.id,
-        status: draftStatuses[student.id] || "UNMARKED",
+        status: getStudentStatus(student, activeRegister.id),
       }));
       const response = await api.patch(
         `/attendance/weekly-register/${activeRegister.id}/`,
         { entries },
       );
       setReport(response.data.report);
+      setDraftStatuses((current) => {
+        const next = { ...current };
+        delete next[activeRegister.id];
+        return next;
+      });
       setNotice(`Week ${weekNumber} attendance saved successfully.`);
     } catch (requestError) {
       setError(requestError.response?.data?.detail || requestError.response?.data?.entries || "Could not save weekly attendance.");
@@ -129,7 +127,7 @@ function RepWeeklyAttendance() {
     }
   };
 
-  const markedCount = Object.values(draftStatuses).filter((value) => value !== "UNMARKED").length;
+  const markedCount = report.students.filter((student) => getStudentStatus(student) !== "UNMARKED").length;
 
   return (
     <AppShell role="CLASS_REP">
@@ -215,8 +213,8 @@ function RepWeeklyAttendance() {
                   </span>
                   <select
                     aria-label={`Attendance status for ${student.name}`}
-                    value={draftStatuses[student.id] || "UNMARKED"}
-                    onChange={(event) => setDraftStatuses((current) => ({ ...current, [student.id]: event.target.value }))}
+                    value={getStudentStatus(student)}
+                    onChange={(event) => setDraftStatuses((current) => ({ ...current, [activeRegister.id]: { ...(current[activeRegister.id] || {}), [student.id]: event.target.value } }))}
                   >
                     {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
@@ -262,7 +260,7 @@ function RepWeeklyAttendance() {
                       </th>
                       {report.weeks.map((week) => {
                         const status = week.id === activeRegister?.id
-                          ? (draftStatuses[student.id] || "UNMARKED")
+                          ? getStudentStatus(student, week.id)
                           : (student.statuses?.[String(week.id)] || "UNMARKED");
                         return <td key={week.id} className={`status-${status.toLowerCase()}`} title={status}>
                           {status === "PRESENT" ? "P" : status === "ABSENT" ? "A" : status === "EXCUSED" ? "E" : "—"}
