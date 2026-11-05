@@ -108,7 +108,7 @@ function LecturerDashboard() {
     }
 
     try {
-      await api.post("/attendance/sessions/create/", {
+      const response = await api.post("/attendance/sessions/create/", {
         department: selectedAssignment.department,
         level: selectedAssignment.level,
         course_code: form.course_code.trim().toUpperCase(),
@@ -117,13 +117,15 @@ function LecturerDashboard() {
         longitude: coordinates.longitude,
         radius_meters: Number(form.radius_meters),
       });
+      if (response.data?.id) {
+        setSessions((current) => [response.data, ...current]);
+      }
       setForm((current) => ({
         ...EMPTY_FORM,
         assignment: current.assignment,
       }));
       setCoordinates(null);
       setNotice("Lecture session created. Start it when you are ready to take attendance.");
-      await load();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Unable to create this lecture session."));
     } finally {
