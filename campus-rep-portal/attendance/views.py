@@ -400,10 +400,14 @@ class MyStatsView(APIView):
     ELIGIBILITY_THRESHOLD = 70
 
     def get(self, request):
+        attended_session_ids = AttendanceRecord.objects.filter(
+            student=request.user,
+        ).values_list('session_id', flat=True)
         eligible_sessions = LectureSession.objects.filter(
             department=request.user.department,
             level=request.user.level,
-            has_ended=True,
+        ).filter(
+            models.Q(has_ended=True) | models.Q(pk__in=attended_session_ids)
         ).order_by('-created_at')
 
         total_sessions = eligible_sessions.count()

@@ -66,18 +66,25 @@ class StudentAttendanceStatsTests(TestCase):
         )
 
     def test_never_started_sessions_do_not_reduce_attendance_rate(self):
-        completed_and_attended = self.create_session(is_active=False, has_ended=True)
+        # Keep the two attended sessions consecutive in reverse chronological
+        # order so the streak assertion tests the intended latest-session run.
         self.create_session(is_active=False, has_ended=True)
+        completed_and_attended = self.create_session(is_active=False, has_ended=True)
+        active_and_attended = self.create_session(is_active=True, has_ended=False)
         self.create_session(is_active=True, has_ended=False)
         self.create_session(is_active=False, has_ended=False)
         AttendanceRecord.objects.create(student=self.student, session=completed_and_attended)
+        AttendanceRecord.objects.create(student=self.student, session=active_and_attended)
 
         response = self.client.get("/api/attendance/my-stats/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["total_sessions"], 2)
-        self.assertEqual(response.data["attended"], 1)
-        self.assertEqual(response.data["rate"], 50)
+        # An attended live session counts immediately; unattended live/draft
+        # sessions remain excluded until they have ended.
+        self.assertEqual(response.data["total_sessions"], 3)
+        self.assertEqual(response.data["attended"], 2)
+        self.assertEqual(response.data["rate"], 67)
+        self.assertEqual(response.data["streak"], 2)
 
 
 class LectureSessionInputValidationTests(TestCase):
