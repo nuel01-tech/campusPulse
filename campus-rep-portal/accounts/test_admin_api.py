@@ -178,7 +178,12 @@ class OwnerAdminApiTests(TestCase):
         self.assertEqual(rotated.data["code"], "NEW123")
         self.assertNotEqual(initial_code, rotated.data["code"])
 
-    def test_student_can_complete_profile_without_class_code_after_department_rename(self):
+    def test_student_can_complete_profile_with_class_code_after_department_rename(self):
+        ClassCode.objects.create(
+            department=self.department,
+            level="200",
+            code="CSC200",
+        )
         renamed = self.client.patch(
             f"/api/accounts/admin/departments/{self.department.pk}/",
             {"name": "Computer Science (weekdays)", "faculty": "Science"},
@@ -193,6 +198,7 @@ class OwnerAdminApiTests(TestCase):
                 "matric_number": "CSC/2024/001",
                 "phone_number": "08012345678",
                 "level": "200",
+                "class_code": "CSC200",
             },
             format="json",
         )
