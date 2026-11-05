@@ -303,6 +303,8 @@ def _weekly_register_report(user, academic_year=None):
         })
     return {
         'academic_year': academic_year or '',
+        'department': user.department.name if user.department_id else '',
+        'level': user.level or '',
         'weeks': week_data,
         'students': student_data,
         'summary': {
