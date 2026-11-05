@@ -75,12 +75,14 @@ const CameraIcon = () => (
 
 function Profile() {
   const [profile, setProfile] = useState(null);
+  const [departments, setDepartments] = useState([]);
 
   const [form, setForm] = useState({
     matric_number: "",
     phone_number: "",
     class_code: "",
     level: "",
+    department: "",
     first_name: "",
     last_name: "",
   });
@@ -91,7 +93,6 @@ function Profile() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [pictureSaving, setPictureSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [copiedMatric, setCopiedMatric] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -108,20 +109,32 @@ function Profile() {
 
   const loadProfile = async () => {
     try {
-      const r = await api.get("/accounts/profile/");
+      const [r, deptRes] = await Promise.allSettled([
+        api.get("/accounts/profile/"),
+        api.get("/accounts/departments/"),
+      ]);
 
-      setProfile(r.data);
+      if (deptRes.status === "fulfilled") {
+        setDepartments(deptRes.value.data || []);
+      }
 
-      setForm({
-        matric_number: r.data.matric_number || "",
-        phone_number: r.data.phone_number || "",
-        class_code: "",
-        level: r.data.level || "",
-        first_name: r.data.first_name || "",
-        last_name: r.data.last_name || "",
-      });
+      if (r.status === "fulfilled") {
+        setProfile(r.value.data);
 
-      setError("");
+        setForm({
+          matric_number: r.value.data.matric_number || "",
+          phone_number: r.value.data.phone_number || "",
+          class_code: "",
+          level: r.value.data.level || "",
+          department: r.value.data.department ? String(r.value.data.department) : "",
+          first_name: r.value.data.first_name || "",
+          last_name: r.value.data.last_name || "",
+        });
+
+        setError("");
+      } else {
+        setError("Unable to load your profile details.");
+      }
     } catch {
       setError("Unable to load your profile details.");
     } finally {
@@ -155,6 +168,7 @@ function Profile() {
         matric_number: form.matric_number.trim(),
         phone_number: form.phone_number.trim(),
         level: form.level,
+        ...(form.department ? { department: Number(form.department) } : {}),
         ...(!profile?.registration_completed && role === "STUDENT"
           ? { class_code: form.class_code.trim().toUpperCase() }
           : {}),
@@ -265,32 +279,6 @@ function Profile() {
       setTimeout(() => setCopiedMatric(false), 2000);
     } catch {
       setError("Unable to copy the matric number.");
-    }
-  };
-
-  const deleteAccount = async () => {
-    if (
-      !window.confirm(
-        "Delete your representative account permanently? This cannot be undone.",
-      )
-    ) {
-      return;
-    }
-
-    setDeleting(true);
-    setError("");
-
-    try {
-      await api.delete("/accounts/profile/");
-
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-
-      window.location.href = "/";
-    } catch (e) {
-      setError(e.response?.data?.detail || "Unable to delete your account.");
-
-      setDeleting(false);
     }
   };
 
@@ -651,31 +639,52 @@ function Profile() {
                 </label>
               )}
 
-              {!isRep && (
+              {(isRep || !profile?.department) && departments.length > 0 && (
                 <div className="cp-profile-level-box">
                   <label>
-                    Level
+                    Department
                     <select
-                      value={form.level}
+                      value={form.department}
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          level: e.target.value,
+                          department: e.target.value,
                         })
                       }
                     >
-                      <option value="">Select level</option>
-
-                      {["100", "200", "300", "400", "500"].map((level) => (
-                        <option key={level} value={level}>
-                          {level} Level
+                      <option value="">Select department</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
                         </option>
                       ))}
                     </select>
                   </label>
-
                 </div>
               )}
+
+              <div className="cp-profile-level-box">
+                <label>
+                  Level
+                  <select
+                    value={form.level}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        level: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select level</option>
+
+                    {["100", "200", "300", "400", "500"].map((level) => (
+                      <option key={level} value={level}>
+                        {level} Level
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
               <div className="cp-profile-form-footer">
                 <span>Changes are saved to your CampusPulse account.</span>
@@ -691,33 +700,6 @@ function Profile() {
             </form>
           </section>
         </div>
-
-        {/* =====================================================
-            DANGER ZONE
-            ===================================================== */}
-        {isRep && (
-          <section className="cp-profile-danger">
-            <div>
-              <span className="cp-profile-danger-eyebrow">Danger zone</span>
-
-              <h2>Delete representative account</h2>
-
-              <p>
-                Permanently remove your course representative account, lecture
-                history and access keys. This action cannot be undone.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="cp-profile-delete"
-              onClick={deleteAccount}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting account…" : "Delete my account"}
-            </button>
-          </section>
-        )}
       </div>
     </AppShell>
   );

@@ -429,13 +429,29 @@
   }
 
   .cp-owner-header,
+  .cp-owner-panel-heading,
+  .cp-owner-pagination,
   .cp-owner-edit-footer,
   .cp-owner-activity li {
     align-items: flex-start;
     flex-direction: column;
   }
 
+  .cp-owner-header-actions {
+    width: 100%;
+  }
+
+  .cp-owner-header-actions .cp-owner-button {
+    flex: 1 1 auto;
+  }
+
   .cp-owner-panel {
-    padding: 13px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cp-owner-stats {
+    grid-template-columns: 1fr;
   }
 }

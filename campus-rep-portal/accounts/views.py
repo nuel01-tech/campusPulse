@@ -73,7 +73,11 @@ class MyProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
 
     def get_object(self):
-        return self.request.user
+        return (
+            User.objects.select_related('department')
+            .prefetch_related('teaching_assignments__department')
+            .get(pk=self.request.user.pk)
+        )
 
     def update(self, request, *args, **kwargs):
         # Usernames are account identifiers in CampusPulse and cannot be changed.
@@ -87,7 +91,11 @@ class PreferencesView(generics.RetrieveUpdateAPIView):
     serializer_class = PreferencesSerializer
 
     def get_object(self):
-        return self.request.user
+        return (
+            User.objects.select_related('department')
+            .prefetch_related('teaching_assignments__department')
+            .get(pk=self.request.user.pk)
+        )
 
 
 class UpdateMatricView(APIView):
@@ -97,8 +105,14 @@ class UpdateMatricView(APIView):
         user = request.user
         matric_number = (request.data.get('matric_number') or '').strip()
         level = request.data.get('level')
+        department_id = request.data.get('department')
         phone_number = (request.data.get('phone_number') or '').strip()
         class_code = (request.data.get('class_code') or '').strip().upper()
+
+        if department_id and (user.department_id is None or user.role == 'CLASS_REP'):
+            dept = Department.objects.filter(pk=department_id).first()
+            if dept:
+                user.department = dept
 
         if user.role == 'STUDENT':
             if not matric_number or not phone_number:
@@ -286,10 +300,17 @@ class ClassmatesView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = User.objects.filter(
-            department=user.department,
-            level=user.level,
-        ).exclude(pk=user.pk).order_by('first_name', 'last_name', 'username')
+        if not user.department_id or not user.level:
+            return User.objects.none()
+        qs = (
+            User.objects.select_related('department')
+            .filter(
+                department=user.department,
+                level=user.level,
+            )
+            .exclude(pk=user.pk)
+            .order_by('first_name', 'last_name', 'username')
+        )
         search = self.request.query_params.get('search', '').strip()
         if search:
             from django.db.models import Q
@@ -389,6 +410,9 @@ def get_allowed_webauthn_origins(request=None):
             if (
                 hostname in {"localhost", "127.0.0.1"}
                 or hostname.endswith(".netlify.app")
+                or hostname.endswith(".vercel.app")
+                or hostname.endswith(".onrender.com")
+                or hostname.endswith(".railway.app")
                 or hostname.startswith("192.168.")
                 or hostname.startswith("10.")
             ):
@@ -398,16 +422,19 @@ def get_allowed_webauthn_origins(request=None):
 
 
 def get_webauthn_rp_id(request=None):
+    if request:
+        request_origin = request.headers.get("Origin")
+        if request_origin:
+            clean_origin = request_origin.rstrip("/")
+            if clean_origin in get_allowed_webauthn_origins(request):
+                hostname = urlparse(clean_origin).hostname
+                if hostname:
+                    return hostname.rstrip(".").lower()
+
     configured_rp_id = getattr(settings, "WEBAUTHN_RP_ID", None)
     if configured_rp_id:
         return configured_rp_id.rstrip(".").lower()
 
-    if request:
-        request_origin = request.headers.get("Origin")
-        if request_origin:
-            hostname = urlparse(request_origin).hostname
-            if hostname:
-                return hostname
     return "localhost"
 
 

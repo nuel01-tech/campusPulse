@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
+import { getCurrentLocation } from "../utils/geolocation";
 import "./LecturerDashboard.css";
 
 const EMPTY_FORM = {
@@ -63,32 +64,25 @@ function LecturerDashboard() {
     load();
   }, []);
 
-  const captureLocation = () => {
+  const captureLocation = async () => {
     setError("");
-    if (!navigator.geolocation) {
-      setError("Location access is not available in this browser.");
-      return;
-    }
     setBusy("location");
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setCoordinates({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        });
-        setBusy("");
-        setNotice("Lecture venue location captured.");
-      },
-      (locationError) => {
-        setBusy("");
-        setError(
-          locationError.code === locationError.PERMISSION_DENIED
-            ? "Allow location access to set the attendance venue."
-            : "Unable to get your location. Try again near the lecture venue.",
-        );
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+    try {
+      const { coords } = await getCurrentLocation();
+      setCoordinates({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+      setNotice("Lecture venue location captured.");
+    } catch (locationError) {
+      setError(
+        locationError?.code === 1
+          ? "Allow location access to set the attendance venue."
+          : "Unable to get your location. Check that location services are enabled and try again.",
+      );
+    } finally {
+      setBusy("");
+    }
   };
 
   const createSession = async (event) => {
@@ -101,10 +95,25 @@ function LecturerDashboard() {
       setBusy("");
       return;
     }
-    if (!coordinates) {
-      setError("Capture your current location before creating the session.");
-      setBusy("");
-      return;
+
+    let activeCoords = coordinates;
+    if (!activeCoords) {
+      try {
+        const { coords } = await getCurrentLocation();
+        activeCoords = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        };
+        setCoordinates(activeCoords);
+      } catch (locationError) {
+        setError(
+          locationError?.code === 1
+            ? "Allow location access to set the attendance venue."
+            : "Capture your current location before creating the session.",
+        );
+        setBusy("");
+        return;
+      }
     }
 
     try {
@@ -113,8 +122,8 @@ function LecturerDashboard() {
         level: selectedAssignment.level,
         course_code: form.course_code.trim().toUpperCase(),
         venue_name: form.venue_name.trim(),
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: activeCoords.latitude,
+        longitude: activeCoords.longitude,
         radius_meters: Number(form.radius_meters),
       });
       if (response.data?.id) {

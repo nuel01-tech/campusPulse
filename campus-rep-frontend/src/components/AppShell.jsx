@@ -112,12 +112,17 @@ function Logo() {
   );
 }
 
+let cachedProfile = null;
+let cachedProfileAt = 0;
+let cachedUnread = 0;
+let cachedNotificationsAt = 0;
+
 function AppShell({ role = "STUDENT", children }) {
   const navigate = useNavigate();
 
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [profile, setProfile] = useState(null);
+  const [unread, setUnread] = useState(cachedUnread);
+  const [profile, setProfile] = useState(cachedProfile);
 
   const username = useMemo(() => {
     try {
@@ -191,6 +196,7 @@ function AppShell({ role = "STUDENT", children }) {
         overview: [
           ["/rep", "Dashboard", "grid"],
           ["/rep/sessions", "Sessions", "calendar"],
+          ["/rep/weekly-attendance", "Weekly register", "calendar"],
           ["/rep/announcements", "Announcements", "megaphone"],
           ["/rep/activity", "Activity log", "clock"],
         ],
@@ -258,43 +264,57 @@ function AppShell({ role = "STUDENT", children }) {
       ];
 
   useEffect(() => {
-    const loadProfile = () => {
+    const loadProfile = (force = false) => {
+      if (!force && cachedProfile && Date.now() - cachedProfileAt < 30000) {
+        setProfile(cachedProfile);
+        return;
+      }
       api
         .get("/accounts/profile/")
-        .then((response) => setProfile(response.data))
+        .then((response) => {
+          cachedProfile = response.data;
+          cachedProfileAt = Date.now();
+          setProfile(response.data);
+        })
         .catch(() => {});
     };
 
-    loadProfile();
-    window.addEventListener("campuspulse:profile-updated", loadProfile);
+    loadProfile(false);
+    const handleProfileUpdated = () => loadProfile(true);
+    window.addEventListener("campuspulse:profile-updated", handleProfileUpdated);
 
     return () => {
-      window.removeEventListener("campuspulse:profile-updated", loadProfile);
+      window.removeEventListener("campuspulse:profile-updated", handleProfileUpdated);
     };
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadNotifications = () => {
+    const loadNotifications = (force = false) => {
+      if (!force && Date.now() - cachedNotificationsAt < 15000) {
+        setUnread(cachedUnread);
+        return;
+      }
       api
         .get("/attendance/notifications/")
         .then((response) => {
           if (!mounted) return;
 
           const notifications = response.data || [];
-
-          setUnread(
-            notifications.filter((notification) => !notification.is_read)
-              .length,
-          );
+          const count = notifications.filter(
+            (notification) => !notification.is_read,
+          ).length;
+          cachedUnread = count;
+          cachedNotificationsAt = Date.now();
+          setUnread(count);
         })
         .catch(() => {});
     };
 
-    loadNotifications();
+    loadNotifications(false);
 
-    const timer = setInterval(loadNotifications, 20000);
+    const timer = setInterval(() => loadNotifications(true), 30000);
 
     return () => {
       mounted = false;
@@ -303,6 +323,10 @@ function AppShell({ role = "STUDENT", children }) {
   }, []);
 
   const logout = () => {
+    cachedProfile = null;
+    cachedProfileAt = 0;
+    cachedUnread = 0;
+    cachedNotificationsAt = 0;
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
     navigate("/");

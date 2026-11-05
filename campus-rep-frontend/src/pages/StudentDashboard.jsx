@@ -8,6 +8,10 @@ import {
   authenticatePasskeyForSession,
   fetchPasskeyStatus,
 } from "../utils/passkey";
+import {
+  getCurrentLocation as fetchDeviceLocation,
+  getHighPrecisionAccuracy,
+} from "../utils/geolocation";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -230,24 +234,7 @@ function StudentDashboard() {
     };
   }, []);
 
-  const getCurrentLocation = async () => {
-    if (!navigator.geolocation) {
-      const error = new Error("Your browser does not support location.");
-      error.code = 0;
-      throw error;
-    }
-
-    const locate = (options) =>
-      new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
-      });
-
-    return locate({
-      enableHighAccuracy: true,
-      timeout: 30000,
-      maximumAge: 0,
-    });
-  };
+  const getCurrentLocation = async () => fetchDeviceLocation();
 
   const requestLocationAccess = async () => {
     setRequestingLocation(true);
@@ -293,12 +280,19 @@ function StudentDashboard() {
       const attendanceGrant = await authenticatePasskeyForSession(id);
 
       setMessage("Submitting attendance check-in...");
+      const targetSession = activeSessions.find((s) => s.id === id);
+      const precisionAccuracy = getHighPrecisionAccuracy(
+        position,
+        targetSession?.radius_meters,
+      );
       const response = await api.post(
         `/attendance/sessions/${id}/checkin/`,
         {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
+          ...(precisionAccuracy !== undefined
+            ? { accuracy: precisionAccuracy }
+            : {}),
           attendance_grant: attendanceGrant,
         },
       );

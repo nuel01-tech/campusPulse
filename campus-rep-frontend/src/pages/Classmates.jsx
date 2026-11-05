@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
@@ -241,6 +242,7 @@ function RepCard({
   selectedSessionId,
   onMarkAttendance,
   markingAttendance,
+  alreadyMarked,
 }) {
   const isRep = person.role === "CLASS_REP";
 
@@ -328,9 +330,13 @@ function RepCard({
             type="button"
             className="cp-small-action cp-small-action-activate"
             onClick={() => onMarkAttendance(person)}
-            disabled={!selectedSessionId || markingAttendance}
+            disabled={!selectedSessionId || markingAttendance || alreadyMarked}
           >
-            {markingAttendance ? "Marking…" : "Mark present"}
+            {alreadyMarked
+              ? "Marked present ✓"
+              : markingAttendance
+                ? "Marking…"
+                : "Mark present"}
           </button>
         </div>
       )}
@@ -404,6 +410,7 @@ function Classmates() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [markingStudentId, setMarkingStudentId] = useState(null);
+  const [markedBySession, setMarkedBySession] = useState({});
 
   const [suspendModal, setSuspendModal] = useState({
     open: false,
@@ -497,6 +504,13 @@ function Classmates() {
         `/attendance/classmates/${student.id}/mark-attendance/`,
         { session_id: selectedSessionId },
       );
+      setMarkedBySession((prev) => ({
+        ...prev,
+        [selectedSessionId]: {
+          ...(prev[selectedSessionId] || {}),
+          [student.id]: true,
+        },
+      }));
       setSuccessNotice(response.data.detail);
     } catch (requestError) {
       setError(
@@ -749,8 +763,20 @@ function Classmates() {
             <div>
               <strong>Manual attendance</strong>
               <span>
-                Use this only when a student cannot check in from their phone.
-                The mark will appear in the session export.
+                Use this when a student cannot check in from their phone. The
+                mark will appear in the session export.{" "}
+                {activeSessions.length === 0 && (
+                  <>
+                    <Link to="/rep#cp-create-session" style={{ fontWeight: 700, color: "var(--cp-green-800)" }}>
+                      Start a live session
+                    </Link>{" "}
+                    or open the{" "}
+                    <Link to="/rep/weekly-attendance" style={{ fontWeight: 700, color: "var(--cp-green-800)" }}>
+                      Weekly attendance register
+                    </Link>
+                    .
+                  </>
+                )}
               </span>
             </div>
             <label>
@@ -847,6 +873,7 @@ function Classmates() {
                         selectedSessionId={selectedSessionId}
                         onMarkAttendance={handleMarkAttendance}
                         markingAttendance={markingStudentId === person.id}
+                        alreadyMarked={Boolean(markedBySession[selectedSessionId]?.[person.id])}
                         onToggleSuspend={(target) =>
                           setSuspendModal({
                             open: true,
@@ -898,6 +925,7 @@ function Classmates() {
                         selectedSessionId={selectedSessionId}
                         onMarkAttendance={handleMarkAttendance}
                         markingAttendance={markingStudentId === person.id}
+                        alreadyMarked={Boolean(markedBySession[selectedSessionId]?.[person.id])}
                         onToggleSuspend={(target) =>
                           setSuspendModal({
                             open: true,

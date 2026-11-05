@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import { getCurrentLocation, getHighPrecisionAccuracy } from "../utils/geolocation";
 import { authenticatePasskeyForSession } from "../utils/passkey";
 
 function RefreshIcon() {
@@ -122,20 +123,15 @@ function StudentAttendance() {
       return;
     }
 
-    const acceptPosition = (position) => {
-      setLocationStatus("allowed");
-      onSuccess(position);
-    };
-    const fail = (locationError) => {
-      setLocationStatus(locationError.code === 1 ? "denied" : "idle");
-      onFailure(locationError);
-    };
-
-    navigator.geolocation.getCurrentPosition(acceptPosition, fail, {
-      enableHighAccuracy: true,
-      timeout: 30000,
-      maximumAge: 0,
-    });
+    getCurrentLocation()
+      .then((position) => {
+        setLocationStatus("allowed");
+        onSuccess(position);
+      })
+      .catch((locationError) => {
+        setLocationStatus(locationError?.code === 1 ? "denied" : "idle");
+        onFailure(locationError || {});
+      });
   };
 
   const checkIn = (id) => {
@@ -151,6 +147,7 @@ function StudentAttendance() {
       return;
     }
 
+    const targetSession = sessions.find((s) => s.id === id);
     setChecking(id);
 
     requestLocation(
@@ -160,12 +157,18 @@ function StudentAttendance() {
           const attendanceGrant = await authenticatePasskeyForSession(id);
 
           setMessage("Submitting attendance check-in...");
+          const precisionAccuracy = getHighPrecisionAccuracy(
+            position,
+            targetSession?.radius_meters,
+          );
           const response = await api.post(
             `/attendance/sessions/${id}/checkin/`,
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
+              ...(precisionAccuracy !== undefined
+                ? { accuracy: precisionAccuracy }
+                : {}),
               attendance_grant: attendanceGrant,
             },
           );

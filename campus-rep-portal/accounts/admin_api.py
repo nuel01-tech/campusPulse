@@ -700,14 +700,21 @@ class AdminAnnouncementListView(APIView):
                 f"Sent {category.lower()} announcement '{title}' to {department.name}, {level} level ({recipient_count} students).",
             )
 
-        external_delivery_errors = 0
-        for student in students.iterator():
-            Notification.objects.create(
-                user=student,
-                type="ANNOUNCEMENT",
-                title=title,
-                body=body,
+        student_list = list(students)
+        if student_list:
+            Notification.objects.bulk_create(
+                [
+                    Notification(
+                        user_id=student.pk,
+                        type="ANNOUNCEMENT",
+                        title=title,
+                        body=body,
+                    )
+                    for student in student_list
+                ]
             )
+        external_delivery_errors = 0
+        for student in student_list:
             if not student.announcement_notifications:
                 continue
             try:

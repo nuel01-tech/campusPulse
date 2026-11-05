@@ -35,6 +35,9 @@ class LectureSessionSerializer(serializers.ModelSerializer):
         return value
 
     def get_attendee_count(self, obj):
+        annotated = getattr(obj, "attendee_count", None)
+        if annotated is not None:
+            return int(annotated)
         return obj.attendancerecord_set.count()
 
     def get_has_checked_in(self, obj):
@@ -48,12 +51,17 @@ class LectureSessionSerializer(serializers.ModelSerializer):
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
-    posted_by_name = serializers.CharField(source='posted_by.get_full_name', read_only=True)
+    posted_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Announcement
         fields = ['id', 'title', 'body', 'category', 'due_date', 'department', 'level', 'posted_by_name', 'created_at']
         read_only_fields = ['department', 'level', 'posted_by']
+
+    def get_posted_by_name(self, obj):
+        if not obj.posted_by_id:
+            return 'Campus Administration'
+        return obj.posted_by.get_full_name() or obj.posted_by.username
 
 
 class CampusDocumentSerializer(serializers.ModelSerializer):
@@ -77,8 +85,11 @@ class CampusDocumentSerializer(serializers.ModelSerializer):
 
     def get_file_size(self, obj):
         try:
+            storage_cls = type(getattr(obj.file, 'storage', None)).__name__
+            if 'Cloudinary' in storage_cls:
+                return getattr(obj.file, '_size', 0) or 0
             return obj.file.size
-        except (OSError, ValueError):
+        except Exception:
             return 0
 
 

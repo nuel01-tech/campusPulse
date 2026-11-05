@@ -3,6 +3,7 @@ import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import AppShell from "../components/AppShell";
+import { getCurrentLocation } from "../utils/geolocation";
 
 function LocationIcon() {
   return (
@@ -201,26 +202,29 @@ function RepDashboard() {
     );
   };
 
-  const loadClassCode = async () => {
-    try {
-      const r = await api.get("/attendance/my-class-code/");
-      setClassCode(r.data.code || "");
-    } catch {
-      setClassCode("");
-    }
-  };
-
   const load = async () => {
     try {
-      const [s, a] = await Promise.all([
+      const [sRes, aRes, cRes, pRes] = await Promise.allSettled([
         api.get("/attendance/sessions/mine/"),
         api.get("/attendance/audit-log/"),
+        api.get("/attendance/my-class-code/"),
+        api.get("/accounts/profile/"),
       ]);
 
-      setSessions(s.data || []);
-      setAuditLog(a.data || []);
-
-      await loadClassCode();
+      if (sRes.status === "fulfilled") {
+        setSessions(sRes.value.data || []);
+      }
+      if (aRes.status === "fulfilled") {
+        setAuditLog(aRes.value.data || []);
+      }
+      if (cRes.status === "fulfilled") {
+        setClassCode(cRes.value.data?.code || "");
+      } else {
+        setClassCode("");
+      }
+      if (pRes.status === "fulfilled" && pRes.value.data?.level) {
+        setLevel(String(pRes.value.data.level));
+      }
     } catch {
       setError("Some dashboard data could not be loaded.");
     } finally {
@@ -274,58 +278,54 @@ function RepDashboard() {
     }
   };
 
-  const create = (e) => {
+  const create = async (e) => {
     e.preventDefault();
 
     setLoading(true);
     setError("");
     setNotice("");
 
-    if (!navigator.geolocation) {
-      setError("Your browser does not support location.");
-      setLoading(false);
-      return;
-    }
+    try {
+      const p = await getCurrentLocation();
+      const response = await api.post("/attendance/sessions/create/", {
+        course_code: courseCode.trim(),
+        venue_name: venueName.trim(),
+        level,
+        radius_meters: Number(radius),
+        latitude: p.coords.latitude,
+        longitude: p.coords.longitude,
+        start_now: true,
+      });
 
-    navigator.geolocation.getCurrentPosition(
-      async (p) => {
-        try {
-          const response = await api.post("/attendance/sessions/create/", {
-            course_code: courseCode.trim(),
-            venue_name: venueName.trim(),
-            level,
-            radius_meters: Number(radius),
-            latitude: p.coords.latitude,
-            longitude: p.coords.longitude,
-          });
+      if (response.data?.id) {
+        setSessions((current) => [response.data, ...current]);
+      } else {
+        throw new Error(
+          "The server did not confirm that the session was created. Refresh your sessions before trying again.",
+        );
+      }
 
-          if (response.data?.id) {
-            setSessions((current) => [response.data, ...current]);
-          } else {
-            // Do not show success if the server did not return the created session.
-            throw new Error("The server did not confirm that the session was created. Refresh your sessions before trying again.");
-          }
-
-          setCourseCode("");
-          setVenueName("");
-          setNotice("Session created successfully.");
-        } catch (e) {
-          setError(getApiErrorMessage(e, e.message || "Failed to create session."));
-        } finally {
-          setLoading(false);
-        }
-      },
-      (geoError) => {
+      setCourseCode("");
+      setVenueName("");
+      setNotice("Session created and started — students can now check in.");
+    } catch (e) {
+      if (typeof e?.code === "number") {
         const messages = {
+          0: "Your browser does not support location.",
           1: "Location permission was denied. Allow location access for CampusPulse in your browser settings, then try again.",
-          2: "Your device could not determine its location. Turn on device location/GPS, move near an open area, and try again.",
-          3: "Getting your location timed out. Check that GPS is on and try again.",
+          2: "Your device could not determine its location. Turn on device location/GPS and try again.",
+          3: "Getting your location timed out. Check that location services are enabled and try again.",
         };
-        setError(messages[geoError.code] || "CampusPulse could not access your device location. Check location permissions and try again.");
-        setLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-    );
+        setError(
+          messages[e.code] ||
+            "CampusPulse could not access your device location. Check location permissions and try again.",
+        );
+      } else {
+        setError(getApiErrorMessage(e, e.message || "Failed to create session."));
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const post = async (e) => {

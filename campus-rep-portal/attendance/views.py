@@ -104,7 +104,7 @@ class AnnouncementListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Announcement.objects.filter(
+        return Announcement.objects.select_related('posted_by').filter(
             department=self.request.user.department,
             level=self.request.user.level
         )
@@ -407,25 +407,52 @@ class WeeklyAttendanceRegisterDetailView(APIView):
             if student_id in seen_student_ids:
                 return Response({'entries': f'Student {student_id} appears more than once.'}, status=status.HTTP_400_BAD_REQUEST)
             seen_student_ids.add(student_id)
-            student_exists = User.objects.filter(
-                pk=student_id,
+            validated_entries.append((student_id, status_value))
+
+        valid_student_ids = set(
+            User.objects.filter(
+                pk__in=seen_student_ids,
                 role='STUDENT',
                 department=user.department,
                 level=user.level,
-            ).exists()
-            if not student_exists:
+            ).values_list('pk', flat=True)
+        )
+        for student_id, _ in validated_entries:
+            if student_id not in valid_student_ids:
                 return Response({'entries': f'Student {student_id} is not in this class.'}, status=status.HTTP_400_BAD_REQUEST)
-            validated_entries.append((student_id, status_value))
 
         with transaction.atomic():
-            for student_id, status_value in validated_entries:
-                entry, _ = WeeklyAttendanceEntry.objects.get_or_create(
+            existing_map = {
+                entry.student_id: entry
+                for entry in WeeklyAttendanceEntry.objects.filter(
                     register=register,
-                    student_id=student_id,
+                    student_id__in=seen_student_ids,
                 )
-                entry.status = status_value
-                entry.marked_by = user if status_value != 'UNMARKED' else None
-                entry.save(update_fields=['status', 'marked_by', 'updated_at'])
+            }
+            now = timezone.now()
+            to_create = []
+            to_update = []
+            for student_id, status_value in validated_entries:
+                marked_by = user if status_value != 'UNMARKED' else None
+                entry = existing_map.get(student_id)
+                if entry is None:
+                    to_create.append(
+                        WeeklyAttendanceEntry(
+                            register=register,
+                            student_id=student_id,
+                            status=status_value,
+                            marked_by=marked_by,
+                        )
+                    )
+                else:
+                    entry.status = status_value
+                    entry.marked_by = marked_by
+                    entry.updated_at = now
+                    to_update.append(entry)
+            if to_create:
+                WeeklyAttendanceEntry.objects.bulk_create(to_create)
+            if to_update:
+                WeeklyAttendanceEntry.objects.bulk_update(to_update, ['status', 'marked_by', 'updated_at'])
         return Response({
             'detail': 'Weekly attendance saved.',
             'report': _weekly_register_report(user, register.academic_year),
@@ -450,9 +477,12 @@ class IsSessionManager(permissions.BasePermission):
 
 
 def session_queryset_for_manager(user):
+    base_qs = LectureSession.objects.select_related("department").annotate(
+        attendee_count=models.Count("attendancerecord")
+    )
     if user.role == "LECTURER":
-        return LectureSession.objects.filter(created_by=user)
-    return LectureSession.objects.filter(
+        return base_qs.filter(created_by=user)
+    return base_qs.filter(
         department=user.department,
         level=user.level,
     )
@@ -487,23 +517,27 @@ class LectureSessionCreateView(generics.CreateAPIView):
                     {"level": "Class representatives can only create sessions for their own level."}
                 )
 
+        start_now = str(self.request.data.get("start_now", "")).strip().lower() in {"1", "true", "yes"}
         session = serializer.save(
             department=department,
             created_by=user,
-            is_active=False,
+            is_active=start_now,
             has_ended=False,
         )
         record_audit_event(user=user, action='CREATED', session=session)
+        if start_now:
+            record_audit_event(user=user, action='STARTED', session=session)
         students = User.objects.filter(
             department=session.department, level=session.level, role='STUDENT'
         )
         notify_students(
             students=students,
             notification_type='SESSION',
-            title=f'{session.course_code} session created',
+            title=f'{session.course_code} is now live' if start_now else f'{session.course_code} session created',
             body=(
-                f'{session.venue_name} · {session.level} Level. '
-                'Your class rep has created a new attendance session.'
+                f'Attendance is open at {session.venue_name} · {session.level} Level.'
+                if start_now
+                else f'{session.venue_name} · {session.level} Level. Your class rep has created a new attendance session.'
             ),
             preference='session_notifications',
         )
@@ -574,44 +608,48 @@ class ActiveSessionsView(generics.ListAPIView):
 
     def get_queryset(self):
         checked_in = AttendanceRecord.objects.filter(student=self.request.user, session_id=OuterRef("pk"))
-        return LectureSession.objects.filter(
+        return LectureSession.objects.select_related("department").filter(
             department=self.request.user.department,
             level=self.request.user.level,
             is_active=True,
             has_ended=False,
-        ).annotate(student_has_checked_in=Exists(checked_in))
+        ).annotate(
+            attendee_count=models.Count("attendancerecord"),
+            student_has_checked_in=Exists(checked_in),
+        )
 class MySessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
     permission_classes = [IsSessionManager]
 
     def get_queryset(self):
-        return session_queryset_for_manager(self.request.user).order_by('-created_at')
+        return session_queryset_for_manager(self.request.user).order_by('-created_at', '-id')
 class MyStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     ELIGIBILITY_THRESHOLD = 70
 
     def get(self, request):
-        attended_session_ids = AttendanceRecord.objects.filter(
-            student=request.user,
-        ).values_list('session_id', flat=True)
-        eligible_sessions = LectureSession.objects.filter(
-            department=request.user.department,
-            level=request.user.level,
-        ).filter(
-            models.Q(has_ended=True) | models.Q(pk__in=attended_session_ids)
-        ).order_by('-created_at')
+        attended_set = set(
+            AttendanceRecord.objects.filter(
+                student=request.user,
+            ).values_list('session_id', flat=True)
+        )
+        eligible_ids = list(
+            LectureSession.objects.filter(
+                department=request.user.department,
+                level=request.user.level,
+            ).filter(
+                models.Q(has_ended=True) | models.Q(pk__in=attended_set)
+            ).order_by('-created_at', '-id').values_list('id', flat=True)
+        )
 
-        total_sessions = eligible_sessions.count()
-        attended = AttendanceRecord.objects.filter(
-            student=request.user,
-            session__in=eligible_sessions
-        ).count()
+        total_sessions = len(eligible_ids)
+        attended = sum(1 for sid in eligible_ids if sid in attended_set)
         rate = round((attended / total_sessions) * 100) if total_sessions > 0 else 0
 
         streak = 0
-        for session in eligible_sessions:
-            if AttendanceRecord.objects.filter(student=request.user, session=session).exists():
+        for sid in eligible_ids:
+            if sid in attended_set:
                 streak += 1
             else:
                 break
@@ -970,7 +1008,9 @@ class AuditLogView(generics.ListAPIView):
     permission_classes = [IsClassRep]
 
     def get_queryset(self):
-        return AuditLog.objects.filter(rep__department=self.request.user.department)
+        return AuditLog.objects.select_related('rep').filter(
+            rep__department=self.request.user.department
+        )[:50]
 
 class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
