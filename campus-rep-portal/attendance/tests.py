@@ -66,10 +66,11 @@ class StudentAttendanceStatsTests(TestCase):
         )
 
     def test_never_started_sessions_do_not_reduce_attendance_rate(self):
-        completed = self.create_session(is_active=False, has_ended=True)
+        completed_and_attended = self.create_session(is_active=False, has_ended=True)
+        self.create_session(is_active=False, has_ended=True)
         self.create_session(is_active=True, has_ended=False)
         self.create_session(is_active=False, has_ended=False)
-        AttendanceRecord.objects.create(student=self.student, session=completed)
+        AttendanceRecord.objects.create(student=self.student, session=completed_and_attended)
 
         response = self.client.get("/api/attendance/my-stats/")
 
