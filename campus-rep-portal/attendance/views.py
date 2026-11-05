@@ -1,4 +1,5 @@
 import logging
+import math
 from threading import Thread
 
 from rest_framework import generics, permissions
@@ -11,10 +12,11 @@ from django.http import HttpResponse, FileResponse
 from django.utils.text import get_valid_filename
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from rest_framework import status
 from .models import LectureSession, AttendanceRecord, Notification, CampusDocument
-from .utils import haversine_distance
+from .utils import haversine_distance, is_location_confidently_within_radius
 from .models import Announcement
 from .serializers import AnnouncementSerializer, CampusDocumentSerializer, CampusDocumentUploadSerializer
 from rest_framework.exceptions import ValidationError
@@ -137,19 +139,43 @@ class CheckInView(APIView):
 
         student_lat = request.data.get('latitude')
         student_lon = request.data.get('longitude')
+        accuracy = request.data.get('accuracy')
 
         if student_lat is None or student_lon is None:
             return Response({"detail": "latitude and longitude are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             distance = haversine_distance(
-                float(student_lat), float(student_lon),
-                session.latitude, session.longitude,
+                student_lat, student_lon, session.latitude, session.longitude,
             )
+            accuracy_meters = None if accuracy is None else float(accuracy)
+            if accuracy_meters is not None and (
+                not math.isfinite(accuracy_meters) or accuracy_meters < 0
+            ):
+                raise ValueError("accuracy must be a finite, non-negative number.")
         except (TypeError, ValueError):
             return Response(
-                {"detail": "latitude and longitude must be valid numbers."},
+                {"detail": "GPS coordinates and accuracy must be valid numbers within valid ranges."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Older clients may omit accuracy during a staggered deployment. New clients
+        # send it, allowing us to reject fixes whose uncertainty crosses the geofence.
+        if accuracy_meters is not None and not is_location_confidently_within_radius(
+            distance, accuracy_meters, session.radius_meters
+        ):
+            return Response(
+                {
+                    "detail": (
+                        f"GPS reading is not accurate enough to confirm you are inside "
+                        f"the {session.radius_meters}m venue radius. Your estimated "
+                        f"distance is {int(distance)}m with ±{int(accuracy_meters)}m accuracy. "
+                        "Move to an open area and try again."
+                    ),
+                    "distance_meters": round(distance, 1),
+                    "accuracy_meters": round(accuracy_meters, 1),
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         if distance > session.radius_meters:
@@ -355,11 +381,12 @@ class ActiveSessionsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        checked_in = AttendanceRecord.objects.filter(student=self.request.user, session_id=OuterRef("pk"))
         return LectureSession.objects.filter(
             department=self.request.user.department,
             level=self.request.user.level,
-            is_active=True
-        )
+            is_active=True,
+        ).annotate(student_has_checked_in=Exists(checked_in))
 class MySessionsView(generics.ListAPIView):
     serializer_class = LectureSessionSerializer
     permission_classes = [IsSessionManager]

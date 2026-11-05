@@ -68,6 +68,8 @@ function StudentAttendance() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
   const [locationStatus, setLocationStatus] = useState("idle");
 
   const loadSessions = async () => {
@@ -84,14 +86,25 @@ function StudentAttendance() {
     }
   };
 
+  const loadProfile = async () => {
+    setProfileLoading(true);
+    setProfileError("");
+    try {
+      const response = await api.get("/accounts/profile/");
+      setProfile(response.data);
+    } catch (requestError) {
+      setProfile(null);
+      setProfileError(requestError.response?.data?.detail || "We could not verify your registration status. Check your connection and retry.");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Load sessions and account state needed to check in.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSessions();
-    api
-      .get("/accounts/profile/")
-      .then((response) => setProfile(response.data))
-      .catch(() => {});
+    loadProfile();
   }, []);
 
   const requestLocation = (onSuccess, onFailure) => {
@@ -118,29 +131,22 @@ function StudentAttendance() {
       onFailure(locationError);
     };
 
-    navigator.geolocation.getCurrentPosition(
-      acceptPosition,
-      (locationError) => {
-        if (locationError.code === 1) {
-          fail(locationError);
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          acceptPosition,
-          fail,
-          { enableHighAccuracy: false, timeout: 30000, maximumAge: 15000 },
-        );
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 },
-    );
+    navigator.geolocation.getCurrentPosition(acceptPosition, fail, {
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 0,
+    });
   };
 
   const checkIn = (id) => {
     setError("");
     setMessage("");
 
-    if (!profile?.registration_completed) {
+    if (profileLoading || profileError || !profile) {
+      setError("Your registration status is not ready yet. Retry loading your profile before checking in.");
+      return;
+    }
+    if (!profile.registration_completed) {
       setError("Complete your registration details before checking in.");
       return;
     }
@@ -159,13 +165,16 @@ function StudentAttendance() {
             {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
               attendance_grant: attendanceGrant,
             },
           );
 
+          setSessions((current) => current.map((session) => session.id === id
+            ? { ...session, has_checked_in: true, attendee_count: (session.attendee_count || 0) + 1 }
+            : session,
+          ));
           setMessage(response.data.detail || "Successfully checked in!");
-
-          await loadSessions();
         } catch (requestError) {
           setError(
             requestError.response?.data?.detail ||
@@ -247,6 +256,19 @@ function StudentAttendance() {
               </strong>
 
               <p>{message || error}</p>
+            </div>
+          </div>
+        )}
+
+        {profileError && (
+          <div className="cp-attendance-feedback error" role="alert">
+            <span className="cp-attendance-feedback-icon"><AlertIcon /></span>
+            <div>
+              <strong>Could not verify your profile</strong>
+              <p>{profileError}</p>
+              <button type="button" className="cp-attendance-empty-button" onClick={loadProfile} disabled={profileLoading}>
+                {profileLoading ? "Retrying…" : "Retry profile loading"}
+              </button>
             </div>
           </div>
         )}
@@ -391,12 +413,14 @@ function StudentAttendance() {
                   <button
                     type="button"
                     className={`cp-attendance-check-button ${
-                      checking === session.id ? "checking" : ""
+                      session.has_checked_in ? "checked-in" : checking === session.id ? "checking" : ""
                     }`}
                     onClick={() => checkIn(session.id)}
-                    disabled={checking === session.id}
+                    disabled={session.has_checked_in || checking === session.id || profileLoading || Boolean(profileError) || !profile?.registration_completed}
                   >
-                    {checking === session.id ? (
+                    {session.has_checked_in ? (
+                      <><CheckIcon /> Checked in</>
+                    ) : checking === session.id ? (
                       <>
                         <span className="cp-attendance-spinner" />
                         Verifying...

@@ -10,6 +10,7 @@ class LectureSessionSerializer(serializers.ModelSerializer):
         required=False,
     )
     attendee_count = serializers.SerializerMethodField()
+    has_checked_in = serializers.SerializerMethodField()
 
     class Meta:
         model = LectureSession
@@ -18,6 +19,15 @@ class LectureSessionSerializer(serializers.ModelSerializer):
 
     def get_attendee_count(self, obj):
         return obj.attendancerecord_set.count()
+
+    def get_has_checked_in(self, obj):
+        annotated = getattr(obj, "student_has_checked_in", None)
+        if annotated is not None:
+            return bool(annotated)
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.attendancerecord_set.filter(student=request.user).exists()
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):

@@ -14141,6 +14141,16 @@ select:focus-visible {
   opacity: 0.75;
 }
 
+.cp-attendance-check-button.checked-in,
+.cp-attendance-check-button.checked-in:disabled {
+  border-color: #b42318;
+  background: #b42318;
+  color: #fff;
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .cp-attendance-check-button.checking {
   background: var(--cp-green-900, #0b5136);
 }
