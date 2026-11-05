@@ -313,6 +313,16 @@ function StudentDashboard() {
           : session,
       ));
       setMessage(response.data.detail || "Successfully checked in!");
+
+      // Refresh the authoritative attendance rate and streak after the
+      // server confirms this check-in. A stats refresh failure must not turn
+      // a successful attendance record into a false check-in error.
+      try {
+        const statsResponse = await api.get("/attendance/my-stats/");
+        setStats(statsResponse.data || null);
+      } catch {
+        setMessage("Attendance recorded successfully. Refresh your dashboard to update your progress.");
+      }
     } catch (e) {
       setMessage("");
       if (e.response?.data?.no_passkey) {
