@@ -36,7 +36,7 @@ class SignupRegistrationTests(TestCase):
         serializer = SignupSerializer(data=data)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
-    def test_student_completion_does_not_require_class_code(self):
+    def create_incomplete_student(self):
         student = User.objects.create_user(
             username='student_incomplete',
             password='StrongPass123',
@@ -44,14 +44,73 @@ class SignupRegistrationTests(TestCase):
             level='200',
         )
         self.client.force_authenticate(user=student)
+        return student
 
-        complete = self.client.patch('/api/accounts/update-matric/', {
+    def completion_payload(self, class_code=None):
+        payload = {
             'matric_number': 'CMP/2022/010',
             'phone_number': '08012345678',
-        }, format='json')
-        self.assertEqual(complete.status_code, 200)
+        }
+        if class_code is not None:
+            payload['class_code'] = class_code
+        return payload
+
+    def test_student_completion_requires_class_code(self):
+        student = self.create_incomplete_student()
+        response = self.client.patch(
+            '/api/accounts/update-matric/',
+            self.completion_payload(),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Class Code is required', response.json()['detail'])
+        student.refresh_from_db()
+        self.assertFalse(student.registration_completed)
+
+    def test_student_completion_rejects_wrong_department_level_code(self):
+        student = self.create_incomplete_student()
+        ClassCode.objects.create(
+            department=self.department,
+            level='200',
+            code='ABC123',
+        )
+        response = self.client.patch(
+            '/api/accounts/update-matric/',
+            self.completion_payload('WRONG1'),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('incorrect', response.json()['detail'].lower())
+        student.refresh_from_db()
+        self.assertFalse(student.registration_completed)
+
+    def test_student_completion_accepts_matching_class_code_case_insensitively(self):
+        student = self.create_incomplete_student()
+        ClassCode.objects.create(
+            department=self.department,
+            level='200',
+            code='ABC123',
+        )
+        response = self.client.patch(
+            '/api/accounts/update-matric/',
+            self.completion_payload('abc123'),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
         student.refresh_from_db()
         self.assertTrue(student.registration_completed)
+
+    def test_student_completion_fails_if_department_level_code_is_not_configured(self):
+        student = self.create_incomplete_student()
+        response = self.client.patch(
+            '/api/accounts/update-matric/',
+            self.completion_payload('ABC123'),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('not been configured', response.json()['detail'])
+        student.refresh_from_db()
+        self.assertFalse(student.registration_completed)
 
 
 class ClassmatesAndManagementTests(TestCase):
