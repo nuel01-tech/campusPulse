@@ -14151,6 +14151,15 @@ select:focus-visible {
   background: var(--cp-green-900, #0b5136);
 }
 
+.cp-attendance-check-button.checked-in,
+.cp-attendance-check-button.checked-in:disabled {
+  border-color: #b8323b;
+  background: #b8323b;
+  color: #fff;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 .cp-attendance-spinner {
   width: 12px;
   height: 12px;
