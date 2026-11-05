@@ -199,12 +199,17 @@ class ForgotPasswordView(APIView):
         generic = {'detail': 'If the account details are valid, a password reset link has been sent.'}
 
         user = User.objects.filter(username__iexact=username, email__iexact=email).select_related('department').first()
-        if not user or not user.department or not user.level:
+        if not user:
             return Response(generic)
 
-        expected = ClassCode.objects.filter(department=user.department, level=user.level).first()
-        if not expected or expected.code.upper() != class_code:
-            return Response(generic)
+        # Class Codes verify student and Class Rep accounts. Lecturers and
+        # administrators recover access through their registered email address.
+        if user.role in {'STUDENT', 'CLASS_REP'}:
+            if not user.department or not user.level:
+                return Response(generic)
+            expected = ClassCode.objects.filter(department=user.department, level=user.level).first()
+            if not expected or expected.code.upper() != class_code:
+                return Response(generic)
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
