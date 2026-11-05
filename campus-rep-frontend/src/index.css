@@ -17695,3 +17695,14 @@ tbody tr:hover {
   color: transparent;
   font-size: 0;
 }
+
+
+/* Persistent completed check-in state on the student dashboard. */
+.cp-student-checkin.checked-in,
+.cp-student-session-button.checked-in {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #fff;
+  cursor: not-allowed;
+  opacity: 1;
+}
