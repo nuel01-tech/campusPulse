@@ -589,6 +589,7 @@ class PasskeyAuthenticationOptionsView(APIView):
         if not LectureSession.objects.filter(
             pk=session_id,
             is_active=True,
+            has_ended=False,
             department=user.department,
             level=user.level,
         ).exists():
