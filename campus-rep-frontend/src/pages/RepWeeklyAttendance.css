@@ -70,6 +70,7 @@
 .cp-weekly-student-name strong { overflow-wrap: anywhere; }
 .cp-weekly-student-name small { color: var(--cp-muted, #64748b); }
 .cp-weekly-empty { padding: 24px 8px; color: var(--cp-muted, #64748b); text-align: center; }
+.cp-weekly-print-heading { display: none; }
 .cp-weekly-matrix-count { color: var(--cp-muted, #64748b); font-size: .85rem; font-weight: 750; white-space: nowrap; }
 .cp-weekly-table-wrap { overflow-x: auto; border: 1px solid var(--cp-border, #e5eaf0); border-radius: 12px; }
 .cp-weekly-table { width: 100%; border-collapse: collapse; min-width: 700px; font-size: .83rem; }
@@ -104,6 +105,9 @@
   .cp-weekly-page { width: 100%; max-width: none; padding: 0; }
   .cp-weekly-header, .cp-weekly-controls, .cp-weekly-entry-panel, .cp-weekly-print,
   .cp-weekly-feedback, .cp-weekly-legend, .cp-weekly-summary { display: none !important; }
+  .cp-weekly-print-heading { display: block; margin-bottom: 12px; text-align: center; }
+  .cp-weekly-print-heading h1 { font-size: 14pt; margin: 0 0 5px; }
+  .cp-weekly-print-heading p { font-size: 8pt; margin: 2px 0; }
   .cp-weekly-matrix-section { border: 0; box-shadow: none; padding: 0; margin: 0; }
   .cp-weekly-section-heading { margin-bottom: 8px; }
   .cp-weekly-table-wrap { overflow: visible; border: 0; }
