@@ -35,7 +35,7 @@ SECRET_KEY = config('SECRET_KEY')
 
 # Default to local development behavior when the environment is not explicitly configured.
 # Production deployments should set DEBUG=False and SECURE_SSL_REDIRECT=True in their env file.
-DEBUG = config('DEBUG', default=True, cast=parse_debug)
+DEBUG = config('DEBUG', default=False, cast=parse_debug)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -55,7 +55,7 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = config(
     'SECURE_SSL_REDIRECT',
-    default=False,
+    default=not DEBUG,
     cast=bool,
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
