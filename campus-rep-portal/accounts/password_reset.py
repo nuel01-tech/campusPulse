@@ -37,15 +37,20 @@ class ForgotPasswordView(APIView):
             .select_related("department")
             .first()
         )
-        if not user or not user.department or not user.level:
+        if not user:
             return Response(response_data)
 
-        expected_code = ClassCode.objects.filter(
-            department=user.department,
-            level=user.level,
-        ).first()
-        if not expected_code or expected_code.code.upper() != class_code:
-            return Response(response_data)
+        # Class Codes verify student and Class Rep accounts. Lecturers and
+        # administrators recover access through their registered email address.
+        if user.role in {"STUDENT", "CLASS_REP"}:
+            if not user.department or not user.level:
+                return Response(response_data)
+            expected_code = ClassCode.objects.filter(
+                department=user.department,
+                level=user.level,
+            ).first()
+            if not expected_code or expected_code.code.upper() != class_code:
+                return Response(response_data)
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
