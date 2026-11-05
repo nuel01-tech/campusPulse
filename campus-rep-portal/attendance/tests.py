@@ -66,11 +66,13 @@ class StudentAttendanceStatsTests(TestCase):
         )
 
     def test_never_started_sessions_do_not_reduce_attendance_rate(self):
-        completed_and_attended = self.create_session(is_active=False, has_ended=True)
+        # Keep the two attended sessions consecutive in reverse chronological
+        # order so the streak assertion tests the intended latest-session run.
         self.create_session(is_active=False, has_ended=True)
+        completed_and_attended = self.create_session(is_active=False, has_ended=True)
+        active_and_attended = self.create_session(is_active=True, has_ended=False)
         self.create_session(is_active=True, has_ended=False)
         self.create_session(is_active=False, has_ended=False)
-        active_and_attended = self.create_session(is_active=True, has_ended=False)
         AttendanceRecord.objects.create(student=self.student, session=completed_and_attended)
         AttendanceRecord.objects.create(student=self.student, session=active_and_attended)
 
